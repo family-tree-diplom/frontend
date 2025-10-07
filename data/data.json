@@ -1,0 +1,618 @@
+[
+  {
+    "treeBranch": "Основна гілка родини Шабльовських",
+    "treeID": "1",
+    "treeData": {
+      "id": 1,
+      "surname": "Шабльовський",
+      "name": "Іван",
+      "patronymic": "Васильович",
+      "gender": "male",
+      "birthDate": "",
+      "deathDate": "",
+      "wife": {
+        "id": 2,
+        "treeRef": "2",
+        "surname": "Ігнатенко",
+        "name": "Раїса",
+        "patronymic": "Семенівна",
+        "gender": "female",
+        "birthDate": "",
+        "deathDate": ""
+      },
+      "children": [
+        {
+          "id": 3,
+          "surname": "Шабльовський",
+          "name": "Віктор",
+          "patronymic": "Іванович",
+          "gender": "male",
+          "birthDate": "1956-04-08",
+          "deathDate": "2024-11-02",
+          "wife": {
+            "id": 5,
+            "treeRef": "3",
+            "surname": "Прохорова",
+            "name": "Людмила",
+            "patronymic": "Іллівна",
+            "gender": "female",
+            "birthDate": "1956-12-17",
+            "deathDate": ""
+          },
+          "children": [
+            {
+              "id": 6,
+              "surname": "Шабльовський",
+              "name": "Віктор",
+              "patronymic": "Вікторович",
+              "gender": "male",
+              "birthDate": "1977-12-20",
+              "deathDate": "",
+              "wife": {
+                "id": 8,
+                "treeRef": "4",
+                "surname": "Решетило",
+                "name": "Оксана",
+                "patronymic": "Миколаївна",
+                "gender": "female",
+                "birthDate": "1978-03-02",
+                "deathDate": ""
+              },
+              "children": [
+                {
+                  "id": 10,
+                  "surname": "Шабльовський",
+                  "name": "Ілля",
+                  "patronymic": "Вікторович",
+                  "gender": "male",
+                  "birthDate": "1999-04-01",
+                  "deathDate": "",
+                  "wife": {
+                    "id": 31,
+                    "surname": "Якименко",
+                    "name": "Любов",
+                    "patronymic": "Григорівна",
+                    "gender": "female",
+                    "birthDate": "2000-08-29",
+                    "deathDate": ""
+                  }
+                }
+              ]
+            },
+            {
+              "id": 7,
+              "surname": "Шабльовський",
+              "name": "Дмитро",
+              "patronymic": "Вікторович",
+              "gender": "male",
+              "birthDate": "1981-06-03",
+              "deathDate": "",
+              "wife": {
+                "id": 9,
+                "treeRef": "5",
+                "surname": "Міскі",
+                "name": "Ольга",
+                "patronymic": "Володимирівна",
+                "gender": "female",
+                "birthDate": "",
+                "deathDate": ""
+              },
+              "children": [
+                {
+                  "id": 11,
+                  "surname": "Шабльовська",
+                  "name": "Марія",
+                  "patronymic": "Дмитрівна",
+                  "gender": "female",
+                  "birthDate": "",
+                  "deathDate": ""
+                },
+                {
+                  "id": 12,
+                  "surname": "Шабльовський",
+                  "name": "Тимофій",
+                  "patronymic": "Дмитрович",
+                  "gender": "male",
+                  "birthDate": "",
+                  "deathDate": ""
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": 4,
+          "surname": "Шабльовський",
+          "name": "Микола",
+          "patronymic": "Іванович",
+          "gender": "male",
+          "birthDate": "",
+          "deathDate": "",
+          "children": [
+            {
+              "id": 13,
+              "surname": "Шабльовський",
+              "name": "Микола",
+              "patronymic": "Миколайович",
+              "gender": "male",
+              "birthDate": "",
+              "deathDate": ""
+            },
+            {
+              "id": 14,
+              "surname": "Шабльовський",
+              "name": "Віктор",
+              "patronymic": "Миколайович",
+              "gender": "male",
+              "birthDate": "",
+              "deathDate": ""
+            }
+          ]
+        }
+      ]
+    }
+  },
+
+  {
+    "treeBranch": "Гілка Ігнатенків",
+    "treeID": "2",
+    "treeData": {
+      "id": 15,
+      "surname": "Ігнатенко",
+      "name": "Семен",
+      "patronymic": "",
+      "gender": "male",
+      "birthDate": "",
+      "deathDate": "",
+      "wife": {},
+      "children": [
+        {
+          "id": 16,
+          "surname": "Ігнатенко",
+          "name": "Валентина",
+          "patronymic": "Семенівна",
+          "gender": "female",
+          "birthDate": "",
+          "deathDate": ""
+        },
+        {
+          "id": 17,
+          "surname": "Ігнатенко",
+          "name": "Ольга",
+          "patronymic": "Семенівна",
+          "gender": "female",
+          "birthDate": "",
+          "deathDate": ""
+        },
+        {
+          "id": 18,
+          "surname": "Ігнатенко",
+          "name": "Галина",
+          "patronymic": "Семенівна",
+          "gender": "female",
+          "birthDate": "",
+          "deathDate": ""
+        },
+        {
+          "id": 2,
+          "surname": "Ігнатенко",
+          "name": "Раїса",
+          "patronymic": "Семенівна",
+          "gender": "female",
+          "birthDate": "",
+          "deathDate": "",
+          "husband": {
+            "id": 1,
+            "surname": "Шабльовський",
+            "name": "Іван",
+            "patronymic": "Васильович",
+            "gender": "male",
+            "birthDate": "",
+            "deathDate": ""
+          },
+          "children": [
+            {
+              "id": 3,
+              "surname": "Шабльовський",
+              "name": "Віктор",
+              "patronymic": "Іванович",
+              "gender": "male",
+              "birthDate": "1956-04-08",
+              "deathDate": "2024-11-02",
+              "wife": {
+                "id": 5,
+                "surname": "Прохорова",
+                "name": "Людмила",
+                "patronymic": "Іллівна",
+                "gender": "female",
+                "birthDate": "1956-12-17",
+                "deathDate": ""
+              },
+              "children": [
+                {
+                  "id": 6,
+                  "surname": "Шабльовський",
+                  "name": "Віктор",
+                  "patronymic": "Вікторович",
+                  "gender": "male",
+                  "birthDate": "1977-12-20",
+                  "deathDate": "",
+                  "wife": {
+                    "id": 8,
+                    "surname": "Решетило",
+                    "name": "Оксана",
+                    "patronymic": "Миколаївна",
+                    "gender": "female",
+                    "birthDate": "1978-03-02",
+                    "deathDate": ""
+                  },
+                  "children": [
+                    {
+                      "id": 10,
+                      "surname": "Шабльовський",
+                      "name": "Ілля",
+                      "patronymic": "Вікторович",
+                      "gender": "male",
+                      "birthDate": "1999-04-01",
+                      "deathDate": ""
+                    }
+                  ]
+                },
+                {
+                  "id": 7,
+                  "surname": "Шабльовський",
+                  "name": "Дмитро",
+                  "patronymic": "Вікторович",
+                  "gender": "male",
+                  "birthDate": "1981-06-03",
+                  "deathDate": "",
+                  "wife": {
+                    "id": 9,
+                    "surname": "Міскі",
+                    "name": "Ольга",
+                    "patronymic": "Володимирівна",
+                    "gender": "female",
+                    "birthDate": "",
+                    "deathDate": ""
+                  },
+                  "children": [
+                    {
+                      "id": 11,
+                      "surname": "Шабльовська",
+                      "name": "Марія",
+                      "patronymic": "Дмитрівна",
+                      "gender": "female",
+                      "birthDate": "",
+                      "deathDate": ""
+                    },
+                    {
+                      "id": 12,
+                      "surname": "Шабльовський",
+                      "name": "Тимофій",
+                      "patronymic": "Дмитрович",
+                      "gender": "male",
+                      "birthDate": "",
+                      "deathDate": ""
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "id": 4,
+              "surname": "Шабльовський",
+              "name": "Микола",
+              "patronymic": "Іванович",
+              "gender": "male",
+              "birthDate": "",
+              "deathDate": "",
+              "children": [
+                {
+                  "id": 13,
+                  "surname": "Шабльовський",
+                  "name": "Микола",
+                  "patronymic": "Миколайович",
+                  "gender": "male",
+                  "birthDate": "",
+                  "deathDate": ""
+                },
+                {
+                  "id": 14,
+                  "surname": "Шабльовський",
+                  "name": "Віктор",
+                  "patronymic": "Миколайович",
+                  "gender": "male",
+                  "birthDate": "",
+                  "deathDate": ""
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": 19,
+          "surname": "Ігнатенко",
+          "name": "Володимир",
+          "patronymic": "Семенович",
+          "gender": "male",
+          "birthDate": "",
+          "deathDate": ""
+        },
+        {
+          "id": 20,
+          "surname": "Ігнатенко",
+          "name": "Леонід",
+          "patronymic": "Семенович",
+          "gender": "male",
+          "birthDate": "",
+          "deathDate": ""
+        }
+      ]
+    }
+  },
+
+  {
+    "treeBranch": "Гілка Прохорових",
+    "treeID": "3",
+    "treeData": {
+      "id": 21,
+      "surname": "Прохоров",
+      "name": "Ілля",
+      "patronymic": "Якович",
+      "gender": "male",
+      "birthDate": "",
+      "deathDate": "",
+      "wife": {
+        "id": 22,
+        "surname": "Лаврищева",
+        "name": "Анна",
+        "patronymic": "Федорівна",
+        "gender": "female",
+        "birthDate": "",
+        "deathDate": ""
+      },
+      "children": [
+        {
+          "id": 5,
+          "surname": "Прохорова",
+          "name": "Людмила",
+          "patronymic": "Іллівна",
+          "gender": "female",
+          "birthDate": "1956-12-17",
+          "deathDate": "",
+          "husband": {
+            "id": 3,
+            "surname": "Шабльовський",
+            "name": "Віктор",
+            "patronymic": "Іванович",
+            "gender": "male",
+            "birthDate": "1956-04-08",
+            "deathDate": ""
+          },
+          "children": [
+            {
+              "id": 6,
+              "surname": "Шабльовський",
+              "name": "Віктор",
+              "patronymic": "Вікторович",
+              "gender": "male",
+              "birthDate": "1977-12-20",
+              "deathDate": "",
+              "wife": {
+                "id": 8,
+                "surname": "Решетило",
+                "name": "Оксана",
+                "patronymic": "Миколаївна",
+                "gender": "female",
+                "birthDate": "1978-03-02",
+                "deathDate": ""
+              },
+              "children": [
+                {
+                  "id": 10,
+                  "surname": "Шабльовський",
+                  "name": "Ілля",
+                  "patronymic": "Вікторович",
+                  "gender": "male",
+                  "birthDate": "1999-04-01",
+                  "deathDate": ""
+                }
+              ]
+            },
+            {
+              "id": 7,
+              "surname": "Шабльовський",
+              "name": "Дмитро",
+              "patronymic": "Вікторович",
+              "gender": "male",
+              "birthDate": "1981-06-03",
+              "deathDate": "",
+              "wife": {
+                "id": 9,
+                "surname": "Міскі",
+                "name": "Ольга",
+                "patronymic": "Володимирівна",
+                "gender": "female",
+                "birthDate": "",
+                "deathDate": ""
+              },
+              "children": [
+                {
+                  "id": 11,
+                  "surname": "Шабльовська",
+                  "name": "Марія",
+                  "patronymic": "Дмитрівна",
+                  "gender": "female",
+                  "birthDate": "",
+                  "deathDate": ""
+                },
+                {
+                  "id": 12,
+                  "surname": "Шабльовський",
+                  "name": "Тимофій",
+                  "patronymic": "Дмитрович",
+                  "gender": "male",
+                  "birthDate": "",
+                  "deathDate": ""
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": 23,
+          "surname": "Прохоров",
+          "name": "Володимир",
+          "patronymic": "Ілліч",
+          "gender": "male",
+          "birthDate": "",
+          "deathDate": ""
+        }
+      ]
+    }
+  },
+
+  {
+    "treeBranch": "Гілка Решетелів",
+    "treeID": "4",
+    "treeData": {
+      "id": 24,
+      "surname": "Решетило",
+      "name": "Микола",
+      "patronymic": "Порфирович",
+      "gender": "male",
+      "birthDate": "",
+      "deathDate": "",
+      "wife": {
+        "id": 25,
+        "surname": "Бондаренко",
+        "name": "Зінаїда",
+        "patronymic": "Леонтіївна",
+        "gender": "female",
+        "birthDate": "",
+        "deathDate": ""
+      },
+      "children": [
+        {
+          "id": 26,
+          "surname": "Решетило",
+          "name": "Олександр",
+          "patronymic": "Миколайович",
+          "gender": "male",
+          "birthDate": "",
+          "deathDate": ""
+        },
+        {
+          "id": 27,
+          "surname": "Решетило",
+          "name": "Юлія",
+          "patronymic": "Миколаївна",
+          "gender": "female",
+          "birthDate": "",
+          "deathDate": ""
+        },
+        {
+          "id": 28,
+          "surname": "Решетило",
+          "name": "Олена",
+          "patronymic": "Миколаївна",
+          "gender": "female",
+          "birthDate": "1978-03-02",
+          "deathDate": ""
+        },
+        {
+          "id": 8,
+          "surname": "Решетило",
+          "name": "Оксана",
+          "patronymic": "Миколаївна",
+          "gender": "female",
+          "birthDate": "1978-03-02",
+          "deathDate": "",
+          "husband": {
+            "id": 6,
+            "surname": "Шабльовський",
+            "name": "Віктор",
+            "patronymic": "Вікторович",
+            "gender": "male",
+            "birthDate": "1977-12-20",
+            "deathDate": ""
+          },
+          "children": [
+            {
+              "id": 10,
+              "surname": "Шабльовський",
+              "name": "Ілля",
+              "patronymic": "Вікторович",
+              "gender": "male",
+              "birthDate": "1999-04-01",
+              "deathDate": ""
+            }
+          ]
+        }
+      ]
+    }
+  },
+
+  {
+    "treeBranch": "Гілка Місків",
+    "treeID": "5",
+    "treeData": {
+      "id": 29,
+      "surname": "Міскі",
+      "name": "Володимир",
+      "patronymic": "",
+      "gender": "male",
+      "birthDate": "",
+      "deathDate": "",
+      "wife": {
+        "id": 30,
+        "surname": "Міскі",
+        "name": "Тетяна",
+        "patronymic": "",
+        "gender": "female",
+        "birthDate": "",
+        "deathDate": ""
+      },
+      "children": [
+        {
+          "id": 9,
+          "surname": "Міскі",
+          "name": "Ольга",
+          "patronymic": "Володимирівна",
+          "gender": "female",
+          "birthDate": "",
+          "deathDate": "",
+          "husband": {
+            "id": 7,
+            "surname": "Шабльовський",
+            "name": "Дмитро",
+            "patronymic": "Вікторович",
+            "gender": "male",
+            "birthDate": "1981-06-03",
+            "deathDate": ""
+          },
+          "children": [
+            {
+              "id": 11,
+              "surname": "Шабльовська",
+              "name": "Марія",
+              "patronymic": "Дмитрівна",
+              "gender": "female",
+              "birthDate": "",
+              "deathDate": ""
+            },
+            {
+              "id": 12,
+              "surname": "Шабльовський",
+              "name": "Тимофій",
+              "patronymic": "Дмитрович",
+              "gender": "male",
+              "birthDate": "",
+              "deathDate": ""
+            }
+          ]
+        }
+      ]
+    }
+  }
+]
