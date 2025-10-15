@@ -2,9 +2,10 @@
 import { ref, computed, onMounted, onBeforeUnmount } from 'vue';
 import { useRouter } from '#app';
 import treeDataRaw from '@/data/data.json';
-
 // Наша винесена логіка розрахунків
 import { useFamilyTreeLayout } from '~/composables/useFamilyTreeLayout';
+
+const config = useRuntimeConfig();
 
 const props = defineProps({ treeID: { type: String, default: "1" } });
 const router = useRouter();
@@ -19,6 +20,28 @@ const svgWidth = ref(typeof window !== 'undefined' ? window.innerWidth : 3000);
 // Передаємо дані та отримуємо готові масиви вузлів та зв'язків
 const { allNodes, allLinks } = useFamilyTreeLayout(familyTree, svgWidth);
 
+const peoples = await useAsyncData(
+    'peoples',
+    async () => {
+        const response = await $fetch('api/peoples', {
+            baseURL: process.server ? config.public.API_BASE_URL : '',
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: {
+                jsonrpc: '2.0',
+                method: 'default',
+                params: {},
+            },
+        });
+
+        return response[0].result;
+    },
+    {
+        default: () => [],
+    }
+);
 
 // --- БЛОК ІНТЕРАКТИВНОСТІ (Pan & Zoom) ---
 const svgHeight = 1600;
