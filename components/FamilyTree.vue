@@ -3,7 +3,7 @@ import { ref, computed, onMounted, onBeforeUnmount } from 'vue';
 import { useRouter } from '#app';
 import treeDataRaw from '@/data/data.json';
 // Наша винесена логіка розрахунків
-import { useFamilyTreeLayout } from '~/composables/useFamilyTreeLayout';
+// import { useFamilyTreeLayout } from '~/composables/useFamilyTreeLayout';
 
 const config = useRuntimeConfig();
 
@@ -20,7 +20,7 @@ const svgWidth = ref(typeof window !== 'undefined' ? window.innerWidth : 3000);
 // Передаємо дані та отримуємо готові масиви вузлів та зв'язків
 const { allNodes, allLinks } = useFamilyTreeLayout(familyTree, svgWidth);
 
-const peoples = await useAsyncData(
+const {data:peoples} = await useAsyncData(
     'peoples',
     async () => {
         const response = await $fetch('api/peoples', {
@@ -100,7 +100,8 @@ function onMouseUp() {
 <template>
     <v-app>
         <v-container fluid>
-            <pre>{{ peoples }}</pre>
+            <pre>{{ allNodes }}</pre>
+
             <!-- Заголовок Material UI -->
             <v-row justify="center">
                 <v-col cols="auto">
@@ -195,13 +196,20 @@ function onMouseUp() {
                             </g>
                             <!-- Вузли -->
                             <g>
-                                <base-card
-                                    v-for="node in allNodes"
-                                    :key="'node-' + node.id"
-                                    :people="node"
-                                    :width="rectW"
-                                    :height="rectH"
-                                ></base-card>
+<!--                                <base-card-->
+<!--                                    v-for="node in allNodes"-->
+<!--                                    :key="'node-' + node.id"-->
+<!--                                    :people="node"-->
+<!--                                    :width="rectW"-->
+<!--                                    :height="rectH"-->
+<!--                                ></base-card>-->
+<!--                                <base-cardTemplate-->
+<!--                                    v-for="people in peoples.data"-->
+<!--                                    :key="'people-' + people"-->
+<!--                                    :people="people"-->
+<!--                                    :width="rectW"-->
+<!--                                    :height="rectH"-->
+<!--                                ></base-cardTemplate>-->
                             </g>
                         </svg>
                         <!-- Кнопка повернення -->

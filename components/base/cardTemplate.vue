@@ -36,8 +36,6 @@ console.log(props.people)
     <!-- Прямокутник вузла (особа або партнер), з клікабельністю якщо є гілка -->
     <rect
         v-if="!people?.isMarriage"
-        :x="people.x - width / 2"
-        :y="people.y - height / 2"
         :width="width"
         :height="height"
         :rx="24"
@@ -59,9 +57,6 @@ console.log(props.people)
     />
     <!-- Прізвище -->
     <text
-        v-if="!people?.isMarriage"
-        :x="people.x"
-        :y="people.y - 20"
         text-anchor="middle"
         font-size="18"
         font-family="Inter, Arial, sans-serif"
@@ -69,15 +64,12 @@ console.log(props.people)
         fill="#111"
         style="pointer-events: none"
     >
-        {{ people.surname }}
+        {{ people.name }}
     </text>
     <!-- Ім'я -->
     <text
-        v-if="!people?.isMarriage"
-        :x="people.x"
-        :y="people.y"
         text-anchor="middle"
-        font-size="17"
+        font-size="18"
         font-family="Inter, Arial, sans-serif"
         font-weight="bold"
         fill="#111"
@@ -86,45 +78,21 @@ console.log(props.people)
         {{ people.name }}
     </text>
     <!-- По батькові -->
-    <text
-        v-if="!people?.isMarriage"
-        :x="people.x"
-        :y="people.y + 16"
-        text-anchor="middle"
-        font-size="17"
-        font-family="Inter, Arial, sans-serif"
-        font-weight="bold"
-        fill="#111"
-        style="pointer-events: none"
-    >
-        {{ people.patronymic }}
-    </text>
+
     <!-- Дати народження/смерті -->
-    <text
-        v-if="!people?.isMarriage && people.birthDate"
-        :x="people.x"
-        :y="people.y + 32"
-        text-anchor="middle"
-        font-size="13"
-        font-family="Inter, Arial, sans-serif"
-        font-weight="bold"
-        fill="#111"
-        style="pointer-events: none"
-    >
-        {{ people.birthDate }} {{ people.deathDate }}
-    </text>
+
     <!-- Вузол шлюбу (коло) -->
-    <circle
-        v-if="people?.isMarriage"
-        :cx="people.x"
-        :cy="people.y"
-        r="15"
-        fill="#fff7"
-        stroke="#ccc"
-        stroke-width="2"
-        opacity="0.8"
-        style="backdrop-filter: blur(6px)"
-    />
+<!--    <circle-->
+<!--        v-if="people?.isMarriage"-->
+<!--        :cx="people.x"-->
+<!--        :cy="people.y"-->
+<!--        r="15"-->
+<!--        fill="#fff7"-->
+<!--        stroke="#ccc"-->
+<!--        stroke-width="2"-->
+<!--        opacity="0.8"-->
+<!--        style="backdrop-filter: blur(6px)"-->
+<!--    />-->
 </template>
 
 <style scoped lang="scss"></style>

@@ -2,6 +2,15 @@
 export default defineNuxtConfig({
     compatibilityDate: '2025-05-15',
     devtools: { enabled: true },
+    vite: {
+        css: {
+            preprocessorOptions: {
+                scss: {
+                    api: 'modern',
+                },
+            },
+        },
+    },
     css: ['vuetify/styles', '@mdi/font/css/materialdesignicons.min.css'],
     build: {
         transpile: ['vuetify'],
