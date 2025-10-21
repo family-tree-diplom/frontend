@@ -21,4 +21,11 @@ export default defineNuxtConfig({
             SITE_BASE_URL: process.env.SITE_BASE_URL,
         },
     },
+    nitro: {
+        devProxy: {
+            '/api': { target: process.env.API_BASE_URL + '/api/', changeOrigin: true },
+            '/images': { target: process.env.API_BASE_URL + '/images/', changeOrigin: true },
+            '/uploads': { target: process.env.API_BASE_URL + '/uploads/', changeOrigin: true },
+        },
+    },
 });
