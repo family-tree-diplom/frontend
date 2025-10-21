@@ -1,32 +1,13 @@
 <script setup lang="ts">
-const config = useRuntimeConfig();
-const { data: peoples } = useAsyncData(
-    'peoples',
-    async () => {
-        const response = await $fetch('api/peoples', {
-            baseURL: process.server ? config.public.API_BASE_URL : '',
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: { jsonrpc: '2.0', method: 'default', params: {} },
-        });
-        return response[0].result;
-    },
-    { default: () => [] }
-);
+import { useFamilyData } from '~/composables/useFamilyData';
+import { useDraggable } from '~/composables/useDraggable';
+
+const { peoples, relations } = useFamilyData();
 
 const boxRefs = ref([]);
 const lineRefs = ref([]);
 const circleRefs = ref([]);
 const marriageCenters = ref<Record<string, { x: number; y: number }>>({});
-
-const relations = computed(() => {
-    const result: { from: number; to: number; type: string }[] = [];
-    peoples.value.forEach((person) => {
-        if (!Array.isArray(person.relations)) return;
-        person.relations.forEach((r) => result.push({ from: person.id, to: r.id, type: r.type }));
-    });
-    return result;
-});
 
 function makePairKey(a: number, b: number): string {
     return [a, b].sort((x, y) => x - y).join('-');
@@ -40,9 +21,6 @@ function findParentsOf(childId: number) {
     }
     return null;
 }
-
-const marriageLineRefs = ref<SVGLineElement[]>([]);
-const marriageOffset = 40; // насколько вниз уходит линия от брака
 
 const updateAllLines = () => {
     marriageCenters.value = {};
@@ -94,45 +72,7 @@ const updateAllLines = () => {
     });
 };
 
-function makeDraggable(el: HTMLElement, onDragCallback: () => void) {
-    let oldX = 0,
-        oldY = 0,
-        x = 0,
-        y = 0;
-    const dragHandle = (el.querySelector('.drag-handle') as HTMLElement) || el;
-
-    const elementDrag = (e: MouseEvent) => {
-        e.preventDefault();
-        oldX = x - e.clientX;
-        oldY = y - e.clientY;
-        x = e.clientX;
-        y = e.clientY;
-        el.style.top = `${el.offsetTop - oldY}px`;
-        el.style.left = `${el.offsetLeft - oldX}px`;
-        onDragCallback();
-    };
-
-    const closeDragElement = () => {
-        document.removeEventListener('mouseup', closeDragElement);
-        document.removeEventListener('mousemove', elementDrag);
-    };
-
-    const dragMouseDown = (e: MouseEvent) => {
-        e.preventDefault();
-        x = e.clientX;
-        y = e.clientY;
-        document.addEventListener('mouseup', closeDragElement);
-        document.addEventListener('mousemove', elementDrag);
-    };
-
-    dragHandle.addEventListener('mousedown', dragMouseDown);
-    el.style.position = 'absolute';
-    el.style.cursor = 'move';
-
-    onUnmounted(() => {
-        dragHandle.removeEventListener('mousedown', dragMouseDown);
-    });
-}
+const { makeDraggable } = useDraggable(updateAllLines);
 
 function initDragAndLines() {
     if (process.client) {
