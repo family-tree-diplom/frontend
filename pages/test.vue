@@ -1,11 +1,6 @@
 <script setup lang="ts">
-import { process } from 'std-env';
-import { onMounted, onBeforeUnmount, nextTick, ref, watch, computed, onUnmounted } from 'vue';
-
-definePageMeta({ ssr: false });
-
 const config = useRuntimeConfig();
-const { data: peoples } = await useAsyncData(
+const { data: peoples } = useAsyncData(
     'peoples',
     async () => {
         const response = await $fetch('api/peoples', {
@@ -45,6 +40,9 @@ function findParentsOf(childId: number) {
     }
     return null;
 }
+
+const marriageLineRefs = ref<SVGLineElement[]>([]);
+const marriageOffset = 40; // насколько вниз уходит линия от брака
 
 const updateAllLines = () => {
     marriageCenters.value = {};
@@ -192,7 +190,7 @@ watch(
                 class="connector-line"
             />
             <circle
-                v-for="(relation, index) in relations"
+                v-for="(relation, index) in relations.filter((r) => r.type === 'marriage')"
                 :key="index"
                 :ref="(el) => (circleRefs[index] = el)"
                 r="6"
