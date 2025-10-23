@@ -11,6 +11,16 @@ const lineRefs = ref([]); // посилання на svg-лінії
 const circleRefs = ref<Record<string, SVGCircleElement>>({});
 const marriageCenters = ref<Record<string, { x: number; y: number }>>({});
 
+// === Реактивні змінні для управління камерою ===
+const camera = reactive({
+    x: 0,
+    y: 0,
+    scale: 1,
+    isDragging: false,
+    startX: 0,
+    startY: 0,
+});
+
 // === Ключ для збереження позицій у sessionStorage ===
 const STORAGE_KEY = 'family_positions';
 
@@ -233,10 +243,7 @@ function initDragAndLines() {
                     }
 
                     // Робимо елемент перетягуваним
-                    makeDraggable(el, () => {
-                        updateAllLines();
-                        savePositions(); // зберігаємо після кожного руху
-                    });
+                    makeDraggable(el);
                 });
 
                 // 3️⃣ Малюємо всі лінії після застосування позицій
@@ -255,7 +262,31 @@ function cleanupDrag() {
         el.onmousemove = null;
     });
 }
+// === Обробники для руху камери ===
+function onWheel(e: WheelEvent) {
+    e.preventDefault();
+    const zoomIntensity = 0.1;
+    const delta = e.deltaY < 0 ? 1 + zoomIntensity : 1 - zoomIntensity;
+    const newScale = Math.min(Math.max(camera.scale * delta, 0.2), 3); // обмеження масштабу
+    camera.scale = newScale;
+}
 
+function onMouseDown(e: MouseEvent) {
+    if ((e.target as HTMLElement).closest('.draggable-box')) return; // ігнор якщо тягнемо людину
+    camera.isDragging = true;
+    camera.startX = e.clientX - camera.x;
+    camera.startY = e.clientY - camera.y;
+}
+
+function onMouseMove(e: MouseEvent) {
+    if (!camera.isDragging) return;
+    camera.x = e.clientX - camera.startX;
+    camera.y = e.clientY - camera.startY;
+}
+
+function onMouseUp() {
+    camera.isDragging = false;
+}
 /* ============================================================
    5️⃣ ХУКИ ЖИТТЄВОГО ЦИКЛУ
    ============================================================ */
@@ -292,41 +323,50 @@ watch(
 
 <template>
     <!--    <pre>{{peoples}}</pre>-->
-    <div class="main-container">
-        <svg v-if="peoples?.length > 1" class="line-canvas">
-            <defs>
-                <pattern id="grid" width="20" height="20" patternUnits="userSpaceOnUse">
-                    <path d="M 20 0 L 0 0 0 20" fill="none" stroke="#e2e8f0" stroke-width="0.5" />
-                </pattern>
-            </defs>
-            <rect width="100%" height="100%" fill="url(#grid)" />
-            <line
-                v-for="(relation, index) in relations"
-                :key="`${relation.from}-${relation.to}`"
-                :ref="(el) => (lineRefs[index] = el)"
-                class="connector-line"
-            />
-            <circle
-                v-for="(relation, index) in relations.filter((r) => r.type === 'marriage')"
-                :key="index"
-                :ref="(el) => (circleRefs[makePairKey(relation.from, relation.to)] = el)"
-                r="6"
-                class="connector-circle"
-            />
-        </svg>
+    <div class="main-container viewport"
+         @wheel="onWheel"
+         @mousedown="onMouseDown"
+         @mousemove="onMouseMove"
+         @mouseup="onMouseUp"
+         @mouseleave="onMouseUp"
+         :style="{
+                transform: `translate(${camera.x}px, ${camera.y}px) scale(${camera.scale})`,
+                transformOrigin: '0 0',
+            }">
+            <svg v-if="peoples?.length > 1" class="line-canvas">
+                <defs>
+                    <pattern id="grid" width="20" height="20" patternUnits="userSpaceOnUse">
+                        <path d="M 20 0 L 0 0 0 20" fill="none" stroke="#e2e8f0" stroke-width="0.5" />
+                    </pattern>
+                </defs>
+                <rect width="100%" height="100%" fill="url(#grid)" />
+                <line
+                    v-for="(relation, index) in relations"
+                    :key="`${relation.from}-${relation.to}`"
+                    :ref="(el) => (lineRefs[index] = el)"
+                    class="connector-line"
+                />
+                <circle
+                    v-for="(relation, index) in relations.filter((r) => r.type === 'marriage')"
+                    :key="index"
+                    :ref="(el) => (circleRefs[makePairKey(relation.from, relation.to)] = el)"
+                    r="6"
+                    class="connector-circle"
+                />
+            </svg>
 
-        <div
-            v-for="(person, index) in peoples"
-            :key="person.id"
-            :ref="(el) => (boxRefs[person.id] = el)"
-            class="draggable-box"
-            :style="{ top: `${100 + index * 80}px`, left: `${150 + index * 100}px` }"
-        >
-            <div class="drag-handle">{{ person.surname }}</div>
-            <small>{{ person.name }}</small>
-            <small>{{ person.id }}</small>
+            <div
+                v-for="(person, index) in peoples"
+                :key="person.id"
+                :ref="(el) => (boxRefs[person.id] = el)"
+                class="draggable-box"
+                :style="{ top: `${100 + index * 80}px`, left: `${150 + index * 100}px` }"
+            >
+                <div class="drag-handle">{{ person.surname }}</div>
+                <small>{{ person.name }}</small>
+                <small>{{ person.id }}</small>
+            </div>
         </div>
-    </div>
 </template>
 
 <style>
@@ -335,6 +375,18 @@ watch(
     width: 100vw;
     height: 100vh;
     overflow: hidden;
+    cursor: grab;
+}
+
+.main-container:active {
+    cursor: grabbing;
+}
+
+.viewport {
+    position: absolute;
+    top: 0;
+    left: 0;
+    transition: transform 0.02s linear;
 }
 
 .draggable-box {
@@ -369,13 +421,9 @@ watch(
 }
 
 .line-canvas {
-    position: absolute;
-    top: 0;
-    left: 0;
     width: 100%;
     height: 100%;
-    z-index: 1;
-    pointer-events: none;
+    position: absolute;
 }
 
 .connector-line {
