@@ -9,7 +9,7 @@ COPY package*.json ./
 RUN npm install
 
 # Копіюємо всі файли проекту
-COPY . .
+COPY frontend .
 
 # Збираємо Nuxt додаток (SSR або SSG, залежно від налаштувань)
 RUN npm run build

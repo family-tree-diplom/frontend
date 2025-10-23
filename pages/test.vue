@@ -2,17 +2,57 @@
 import { useFamilyData } from '~/composables/useFamilyData';
 import { useDraggable } from '~/composables/useDraggable';
 
+// === Отримуємо дані про людей та зв’язки ===
 const { peoples, relations } = useFamilyData();
 
-const boxRefs = ref([]);
-const lineRefs = ref([]);
+// === Реактивні змінні для посилань на DOM-елементи ===
+const boxRefs = ref([]); // посилання на div-блоки (людей)
+const lineRefs = ref([]); // посилання на svg-лінії
 const circleRefs = ref<Record<string, SVGCircleElement>>({});
 const marriageCenters = ref<Record<string, { x: number; y: number }>>({});
 
+// === Ключ для збереження позицій у sessionStorage ===
+const STORAGE_KEY = 'family_positions';
+
+/* ============================================================
+   1️⃣ ЗБЕРЕЖЕННЯ ТА ВІДНОВЛЕННЯ ПОЗИЦІЙ
+   ============================================================ */
+
+// Зберігає поточні координати draggable-карток у sessionStorage
+function savePositions() {
+    const positions: Record<number, { top: number; left: number }> = {};
+    boxRefs.value.forEach((el: HTMLElement, id: number) => {
+        if (el) {
+            positions[id] = {
+                top: el.offsetTop,
+                left: el.offsetLeft,
+            };
+        }
+    });
+    sessionStorage.setItem(STORAGE_KEY, JSON.stringify(positions));
+}
+
+// Завантажує позиції з sessionStorage
+function loadPositions() {
+    const raw = sessionStorage.getItem(STORAGE_KEY);
+    if (!raw) return {};
+    try {
+        return JSON.parse(raw) as Record<number, { top: number; left: number }>;
+    } catch {
+        return {};
+    }
+}
+
+/* ============================================================
+   2️⃣ ДОПОМІЖНІ ФУНКЦІЇ
+   ============================================================ */
+
+// Формує унікальний ключ для пари (наприклад, 3-7)
 function makePairKey(a: number, b: number): string {
     return [a, b].sort((x, y) => x - y).join('-');
 }
 
+// Знаходить двох батьків для дитини (за її ID)
 function findParentsOf(childId: number) {
     const parents = relations.value.filter((r) => r.type === 'parent' && r.to === childId).map((r) => r.from);
     if (parents.length === 2) {
@@ -22,22 +62,21 @@ function findParentsOf(childId: number) {
     return null;
 }
 
+/* ============================================================
+   3️⃣ ОНОВЛЕННЯ ВСІХ ЛІНІЙ
+   ============================================================ */
+
 const updateAllLines = () => {
     marriageCenters.value = {};
 
-    // === 1. Линии браков и родителей ===
     relations.value.forEach((rel, i) => {
-        // el1 = 'from' (батько або один з подружжя)
-        // el2 = 'to' (дитина або інший з подружжя)
         const el1 = boxRefs.value[rel.from] as HTMLElement;
         const el2 = boxRefs.value[rel.to] as HTMLElement;
         const line = lineRefs.value[i] as SVGLineElement;
-
-        // Перевірка, чи всі елементи готові
         if (!line || !rel.type || !el1 || !el2) return;
 
+        // === Малювання ліній шлюбу ===
         if (rel.type === 'marriage') {
-            // === Логіка для шлюбів (залишилась без змін) ===
             const x1 = el1.offsetLeft + el1.offsetWidth / 2;
             const y1 = el1.offsetTop + el1.offsetHeight / 2;
             const x2 = el2.offsetLeft + el2.offsetWidth / 2;
@@ -47,59 +86,47 @@ const updateAllLines = () => {
             line.setAttribute('y1', String(y1));
             line.setAttribute('x2', String(x2));
             line.setAttribute('y2', String(y2));
-            line.style.display = 'block'; // Показати лінію
+            line.style.display = 'block';
 
             const cx = (x1 + x2) / 2;
             const cy = (y1 + y2) / 2;
 
             const key = makePairKey(rel.from, rel.to);
             const circle = circleRefs.value[key];
-
             if (circle) {
                 circle.setAttribute('cx', String(cx));
                 circle.setAttribute('cy', String(cy));
             }
-
             marriageCenters.value[key] = { x: cx, y: cy };
+        }
 
-        } else if (rel.type === 'parent') {
-            // === НОВА ЛОГІКА ДЛЯ БАТЬКІВСЬКИХ ЗВ'ЯЗКІВ ===
-
-            // Перевіряємо, чи має дитина (rel.to) двох батьків
+        // === Малювання ліній батьківських зв’язків ===
+        else if (rel.type === 'parent') {
             const parents = findParentsOf(rel.to);
-
             if (parents) {
-                // Якщо дитина має ДВОХ батьків (наприклад, Ілля (1) або Пузожитель (6)),
-                // то цей зв'язок буде намальовано складним вузлом в "Етапі 3".
-                // Тому ми ХОВАЄМО просту пряму лінію, яка була створена
-                // в <template>, щоб уникнути дублювання.
-                line.style.display = 'none';
+                line.style.display = 'none'; // ховаємо, якщо є обидва батьки
             } else {
-                // Якщо дитина має ОДНОГО батька (наш випадок, Віктор (3) має
-                // лише батька Віктора (8)), ми малюємо пряму лінію.
-
-                // Координати: від низу батька (el1) до верху дитини (el2)
                 const x1 = el1.offsetLeft + el1.offsetWidth / 2;
-                const y1 = el1.offsetTop + el1.offsetHeight; // Низ батька
+                const y1 = el1.offsetTop + el1.offsetHeight;
                 const x2 = el2.offsetLeft + el2.offsetWidth / 2;
-                const y2 = el2.offsetTop; // Верх дитини
+                const y2 = el2.offsetTop;
 
                 line.setAttribute('x1', String(x1));
                 line.setAttribute('y1', String(y1));
                 line.setAttribute('x2', String(x2));
                 line.setAttribute('y2', String(y2));
-                line.style.display = 'block'; // Показати лінію
+                line.style.display = 'block';
             }
-        } else {
-            // Якщо є якісь інші типи зв'язків, ховаємо їх
+        }
+
+        // Якщо тип невідомий — ховаємо
+        else {
             line.style.display = 'none';
         }
     });
 
-    // === 2. Группы сиблингов (детей у пары) ===
-    // Ця частина не потребувала змін
+    /* === Малювання горизонтальних і вертикальних осей між дітьми === */
     const siblingGroups: Record<string, number[]> = {};
-
     relations.value
         .filter((r) => r.type === 'parent')
         .forEach((r) => {
@@ -107,41 +134,23 @@ const updateAllLines = () => {
             if (parents) {
                 const key = makePairKey(parents.parentA, parents.parentB);
                 if (!siblingGroups[key]) siblingGroups[key] = [];
-                // Уникаємо дублікатів, якщо зв'язок "parent" є для обох батьків
                 if (!siblingGroups[key].includes(r.to)) {
                     siblingGroups[key].push(r.to);
                 }
             }
         });
 
-    // === 3. Отрисовка узлов семьи (брак → дети) ===
-    // Ця частина не потребувала змін
-    // === 3. Отрисовка узлов семьи (брак → дети) ===
     Object.entries(siblingGroups).forEach(([key, children]) => {
-        // 'children' - це масив ID [1, 4, 7] або [6]
-        // 'els' - це масив HTMLElements [el1, el4, el7] або [el6]
         const els = children.map((id) => boxRefs.value[id]).filter(Boolean);
         if (els.length === 0) return;
 
-        // --- центр между детьми (ось сиблингов) ---
         const first = els[0];
         const last = els[els.length - 1];
         const x1 = first.offsetLeft + first.offsetWidth / 2;
         const x2 = last.offsetLeft + last.offsetWidth / 2;
         const centerX = (x1 + x2) / 2;
+        let yAxis: number = els.length === 1 ? els[0].offsetTop : Math.min(...els.map((el) => el.offsetTop)) - 40;
 
-        // === ВИПРАВЛЕННЯ ДЛЯ 1 ДИТИНИ ===
-        // Якщо дитина одна, 'yAxis' (точка з'єднання)
-        // має бути на верхній частині блоку дитини, а не над нею.
-        let yAxis: number;
-        if (els.length === 1) {
-            yAxis = els[0].offsetTop; // Прямо на верхній край
-        } else {
-            yAxis = Math.min(...els.map((el) => el.offsetTop)) - 40; // Вісь над дітьми
-        }
-        // ===================================
-
-        // --- линия от брака до центра оси ---
         const marriage = marriageCenters.value[key];
         if (marriage) {
             let vertLine = document.querySelector(`line[data-marriage-to-sibling="${key}"]`) as SVGLineElement;
@@ -151,16 +160,12 @@ const updateAllLines = () => {
                 vertLine.dataset.marriageToSibling = key;
                 document.querySelector('.line-canvas')?.appendChild(vertLine);
             }
-            // Тепер 'yAxis' буде 'childY' для 1 дитини,
-            // і лінія з'єднається напряму з блоком.
             vertLine.setAttribute('x1', String(marriage.x));
             vertLine.setAttribute('y1', String(marriage.y));
             vertLine.setAttribute('x2', String(centerX));
             vertLine.setAttribute('y2', String(yAxis));
         }
 
-        // --- горизонтальная линия между детьми (ось сиблингов) ---
-        // (Для 1 дитини x1=x2, yAxis=childY, лінія буде "крапкою" - це нормально)
         let siblingLine = document.querySelector(`line[data-sibling="${key}"]`) as SVGLineElement;
         if (!siblingLine) {
             siblingLine = document.createElementNS('http://www.w3.org/2000/svg', 'line');
@@ -173,21 +178,12 @@ const updateAllLines = () => {
         siblingLine.setAttribute('x2', String(x2));
         siblingLine.setAttribute('y2', String(yAxis));
 
-        // --- короткие линии от оси к каждому ребёнку ---
-        // === ВИПРАВЛЕННЯ ІТЕРАЦІЇ ===
-        // Ітеруємо по масиву ID (children) і масиву елементів (els)
-        // одночасно, щоб отримати надійний 'keyChild'.
         children.forEach((childId, index) => {
-            const childEl = els[index]; // Отримуємо відповідний елемент
+            const childEl = els[index];
             if (!childEl) return;
-
             const childX = childEl.offsetLeft + childEl.offsetWidth / 2;
             const childY = childEl.offsetTop;
-
-            // Використовуємо 'childId' для ключа, це надійніше,
-            // ніж 'childEl.textContent'
             const keyChild = `${key}-${childId}`;
-
             let childLine = document.querySelector(`line[data-sibling-child="${keyChild}"]`) as SVGLineElement;
             if (!childLine) {
                 childLine = document.createElementNS('http://www.w3.org/2000/svg', 'line');
@@ -195,8 +191,6 @@ const updateAllLines = () => {
                 childLine.dataset.siblingChild = keyChild;
                 document.querySelector('.line-canvas')?.appendChild(childLine);
             }
-
-            // (Для 1 дитини yAxis=childY, лінія буде "крапкою" - це нормально)
             childLine.setAttribute('x1', String(childX));
             childLine.setAttribute('y1', String(yAxis));
             childLine.setAttribute('x2', String(childX));
@@ -205,6 +199,9 @@ const updateAllLines = () => {
     });
 };
 
+/* ============================================================
+   4️⃣ DRAG-LOGІКА ЗІ ЗБЕРЕЖЕННЯМ ПОЗИЦІЙ
+   ============================================================ */
 
 const { makeDraggable } = useDraggable(updateAllLines);
 
@@ -213,16 +210,43 @@ function initDragAndLines() {
         nextTick(() => {
             boxRefs.value = [];
             lineRefs.value = [];
-            // === ВИПРАВЛЕННЯ ТУТ ===
-            circleRefs.value = {}; // Має бути об'єктом, а не масивом
+            circleRefs.value = {};
 
-            const draggableElements = document.querySelectorAll<HTMLElement>('.draggable-box');
-            draggableElements.forEach((el) => makeDraggable(el, updateAllLines));
-            updateAllLines();
+            // 1️⃣ Завантажуємо збережені координати з sessionStorage
+            const savedPositions = loadPositions();
+
+            // 2️⃣ Чекаємо DOM (бо draggable-box можуть зʼявитися трохи пізніше)
+            setTimeout(() => {
+                const draggableElements = document.querySelectorAll<HTMLElement>('.draggable-box');
+
+                draggableElements.forEach((el) => {
+                    // Отримуємо ID з вмісту блоку
+                    const idText = el.querySelector('small:last-child')?.textContent;
+                    const id = idText ? Number(idText.trim()) : NaN;
+
+                    // Якщо є позиція в sessionStorage — застосовуємо
+                    if (!isNaN(id) && savedPositions[id]) {
+                        const pos = savedPositions[id];
+                        el.style.position = 'absolute';
+                        el.style.top = `${pos.top}px`;
+                        el.style.left = `${pos.left}px`;
+                    }
+
+                    // Робимо елемент перетягуваним
+                    makeDraggable(el, () => {
+                        updateAllLines();
+                        savePositions(); // зберігаємо після кожного руху
+                    });
+                });
+
+                // 3️⃣ Малюємо всі лінії після застосування позицій
+                updateAllLines();
+            }, 50); // невелика пауза, щоб DOM встиг змонтуватися
         });
     }
 }
 
+// Очищаємо події при демонтажі
 function cleanupDrag() {
     const draggableElements = document.querySelectorAll<HTMLElement>('.draggable-box');
     draggableElements.forEach((el) => {
@@ -232,9 +256,19 @@ function cleanupDrag() {
     });
 }
 
+/* ============================================================
+   5️⃣ ХУКИ ЖИТТЄВОГО ЦИКЛУ
+   ============================================================ */
+
 onMounted(initDragAndLines);
 onBeforeUnmount(cleanupDrag);
 
+// Зберігаємо позиції перед закриттям/оновленням сторінки
+if (process.client) {
+    window.addEventListener('beforeunload', savePositions);
+}
+
+// При оновленні hot-reload — перевстановлюємо drag & lines
 if (import.meta.hot) {
     import.meta.hot.accept(() => {
         nextTick(() => {
@@ -244,6 +278,7 @@ if (import.meta.hot) {
     });
 }
 
+// Якщо змінюється peoples — перезапускаємо ініціалізацію
 watch(
     peoples,
     (newPeoples) => {
@@ -256,9 +291,15 @@ watch(
 </script>
 
 <template>
-    <pre>{{peoples}}</pre>
+    <!--    <pre>{{peoples}}</pre>-->
     <div class="main-container">
         <svg v-if="peoples?.length > 1" class="line-canvas">
+            <defs>
+                <pattern id="grid" width="20" height="20" patternUnits="userSpaceOnUse">
+                    <path d="M 20 0 L 0 0 0 20" fill="none" stroke="#e2e8f0" stroke-width="0.5" />
+                </pattern>
+            </defs>
+            <rect width="100%" height="100%" fill="url(#grid)" />
             <line
                 v-for="(relation, index) in relations"
                 :key="`${relation.from}-${relation.to}`"
