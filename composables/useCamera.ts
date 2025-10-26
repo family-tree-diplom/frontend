@@ -20,7 +20,16 @@ export function useCamera() {
         e.preventDefault();
         const zoomIntensity = 0.1;
         const delta = e.deltaY < 0 ? 1 + zoomIntensity : 1 - zoomIntensity;
-        const newScale = Math.min(Math.max(camera.scale * delta, 0.2), 3); // обмеження масштабу
+        const newScale = Math.min(Math.max(camera.scale * delta, 0.2), 3);
+
+        // координаты мыши относительно world-space
+        const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+        const mouseX = (e.clientX - rect.left - camera.x) / camera.scale;
+        const mouseY = (e.clientY - rect.top - camera.y) / camera.scale;
+
+        // пересчитываем смещение так, чтобы zoom был к курсору
+        camera.x -= mouseX * (newScale - camera.scale);
+        camera.y -= mouseY * (newScale - camera.scale);
         camera.scale = newScale;
     }
 

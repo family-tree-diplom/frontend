@@ -4,95 +4,69 @@ import { useDraggable } from '~/composables/useDraggable';
 import { useFamilyLines } from '~/composables/useFamilyLines';
 import { useCamera } from '~/composables/useCamera';
 
-// === Отримуємо дані про людей та зв’язки ===
+/* ============================================================
+   0️⃣ ДАНІ ТА РЕАКТИВНІ СТАНИ
+   ============================================================ */
 const { peoples, relations } = useFamilyData();
 
-// === Реактивні змінні для посилань на DOM-елементи ===
-const boxRefs = ref([]); // посилання на div-блоки (людей)
+const boxRefs = ref([]); // посилання на div-блоки
 const lineRefs = ref([]); // посилання на svg-лінії
 const circleRefs = ref<Record<string, SVGCircleElement>>({});
 
-const { camera, cameraStyle, onWheel, onMouseDown, onMouseMove, onMouseUp } = useCamera();
+interface Position {
+    x: number;
+    y: number;
+}
+const positions = reactive<Record<number, Position>>({});
 
-// === Ключ для збереження позицій у sessionStorage ===
 const STORAGE_KEY = 'family_positions';
+
+const { camera, cameraStyle, onWheel, onMouseDown, onMouseMove, onMouseUp } = useCamera();
+const { updateAllLines, marriageCenters, makePairKey } = useFamilyLines(
+    boxRefs,
+    lineRefs,
+    circleRefs,
+    relations,
+    positions
+);
 
 /* ============================================================
    1️⃣ ЗБЕРЕЖЕННЯ ТА ВІДНОВЛЕННЯ ПОЗИЦІЙ
    ============================================================ */
-
-// Зберігає поточні координати draggable-карток у sessionStorage
 function savePositions() {
-    const positions: Record<number, { top: number; left: number }> = {};
-    boxRefs.value.forEach((el: HTMLElement, id: number) => {
-        if (el) {
-            positions[id] = {
-                top: el.offsetTop,
-                left: el.offsetLeft,
-            };
-        }
-    });
-    sessionStorage.setItem(STORAGE_KEY, JSON.stringify(positions));
+    sessionStorage.setItem(STORAGE_KEY, JSON.stringify(toRaw(positions)));
 }
 
-// Завантажує позиції з sessionStorage
 function loadPositions() {
     const raw = sessionStorage.getItem(STORAGE_KEY);
     if (!raw) return {};
     try {
-        return JSON.parse(raw) as Record<number, { top: number; left: number }>;
+        return JSON.parse(raw) as Record<number, Position>;
     } catch {
         return {};
     }
 }
 
-const { updateAllLines, marriageCenters, makePairKey } = useFamilyLines(boxRefs, lineRefs, circleRefs, relations);
-
 /* ============================================================
-   4️⃣ DRAG-LOGІКА ЗІ ЗБЕРЕЖЕННЯМ ПОЗИЦІЙ
+   2️⃣ ІНІЦІАЛІЗАЦІЯ ТА DRAG
    ============================================================ */
-
-const { makeDraggable } = useDraggable(updateAllLines, camera);
+const { makeDraggable } = useDraggable(updateAllLines, camera, positions);
 
 function initDragAndLines() {
-    if (process.client) {
-        nextTick(() => {
-            boxRefs.value = [];
-            lineRefs.value = [];
-            circleRefs.value = {};
+    if (!process.client) return;
 
-            // 1️⃣ Завантажуємо збережені координати з sessionStorage
-            const savedPositions = loadPositions();
+    nextTick(() => {
+        boxRefs.value = [];
+        lineRefs.value = [];
+        circleRefs.value = {};
 
-            // 2️⃣ Чекаємо DOM (бо draggable-box можуть зʼявитися трохи пізніше)
-            setTimeout(async () => {
-                const draggableElements = document.querySelectorAll<HTMLElement>('.draggable-box');
+        const draggableElements = document.querySelectorAll<HTMLElement>('.draggable-box');
+        draggableElements.forEach((el) => makeDraggable(el));
 
-                draggableElements.forEach((el) => {
-                    // Отримуємо ID з вмісту блоку
-                    const idText = el.querySelector('small:last-child')?.textContent;
-                    const id = idText ? Number(idText.trim()) : NaN;
-
-                    // Якщо є позиція в sessionStorage — застосовуємо
-                    if (!isNaN(id) && savedPositions[id]) {
-                        const pos = savedPositions[id];
-                        el.style.position = 'absolute';
-                        el.style.top = `${pos.top}px`;
-                        el.style.left = `${pos.left}px`;
-                    }
-
-                    // Робимо елемент перетягуваним
-                    makeDraggable(el);
-                });
-
-                // 3️⃣ Малюємо всі лінії після застосування позицій
-                await nextTick(updateAllLines);
-            }, 50); // невелика пауза, щоб DOM встиг змонтуватися
-        });
-    }
+        nextTick(updateAllLines);
+    });
 }
 
-// Очищаємо події при демонтажі
 function cleanupDrag() {
     const draggableElements = document.querySelectorAll<HTMLElement>('.draggable-box');
     draggableElements.forEach((el) => {
@@ -101,19 +75,41 @@ function cleanupDrag() {
         el.onmousemove = null;
     });
 }
+
 /* ============================================================
-   5️⃣ ХУКИ ЖИТТЄВОГО ЦИКЛУ
+   3️⃣ ХУКИ ТА СПОСТЕРЕЖЕННЯ
    ============================================================ */
+watch(
+    peoples,
+    (newPeoples) => {
+        if (!newPeoples || newPeoples.length === 0) return;
 
-onMounted(initDragAndLines);
-onBeforeUnmount(cleanupDrag);
+        const saved = loadPositions();
 
-// Зберігаємо позиції перед закриттям/оновленням сторінки
-if (process.client) {
-    window.addEventListener('beforeunload', savePositions);
-}
+        newPeoples.forEach((p, index) => {
+            if (!positions[p.id]) {
+                if (saved[p.id]) {
+                    positions[p.id] = { x: saved[p.id].x, y: saved[p.id].y };
+                } else {
+                    positions[p.id] = { x: 150 + index * 100, y: 100 + index * 80 };
+                }
+            }
+        });
 
-// При оновленні hot-reload — перевстановлюємо drag & lines
+        nextTick(initDragAndLines);
+    },
+    { immediate: true }
+);
+
+onMounted(() => {
+    if (process.client) window.addEventListener('beforeunload', savePositions);
+});
+onBeforeUnmount(() => {
+    if (process.client) window.removeEventListener('beforeunload', savePositions);
+    cleanupDrag();
+});
+
+// Hot Reload підтримка
 if (import.meta.hot) {
     import.meta.hot.accept(() => {
         nextTick(() => {
@@ -122,21 +118,9 @@ if (import.meta.hot) {
         });
     });
 }
-
-// Якщо змінюється peoples — перезапускаємо ініціалізацію
-watch(
-    peoples,
-    (newPeoples) => {
-        if (newPeoples && newPeoples.length > 0) {
-            initDragAndLines();
-        }
-    },
-    { immediate: true }
-);
 </script>
 
 <template>
-    <!--    <pre>{{peoples}}</pre>-->
     <div
         class="main-container viewport"
         @wheel="onWheel"
@@ -174,7 +158,7 @@ watch(
             :key="person.id"
             :ref="(el) => (boxRefs[person.id] = el)"
             class="draggable-box"
-            :style="{ top: `${100 + index * 80}px`, left: `${150 + index * 100}px` }"
+            :style="{ transform: `translate(${positions[person.id]?.x ?? 0}px, ${positions[person.id]?.y ?? 0}px)` }"
         >
             <div class="drag-handle">{{ person.surname }}</div>
             <small>{{ person.name }}</small>
@@ -191,18 +175,16 @@ watch(
     overflow: hidden;
     cursor: grab;
 }
-
 .main-container:active {
     cursor: grabbing;
 }
-
 .viewport {
     position: absolute;
     top: 0;
     left: 0;
+    transform-origin: 0 0;
     transition: transform 0.02s linear;
 }
-
 .draggable-box {
     width: 200px;
     padding-bottom: 10px;
@@ -216,8 +198,9 @@ watch(
     flex-direction: column;
     align-items: center;
     justify-content: center;
+    position: absolute;
+    transform-origin: top left;
 }
-
 .drag-handle {
     width: 100%;
     padding: 10px;
@@ -228,23 +211,19 @@ watch(
     border-top-left-radius: 8px;
     border-top-right-radius: 8px;
 }
-
 .draggable-box small {
     margin-top: 8px;
     color: #718096;
 }
-
 .line-canvas {
     width: 100%;
     height: 100%;
     position: absolute;
 }
-
 .connector-line {
     stroke: #a0aec0;
     stroke-width: 2px;
 }
-
 .connector-circle {
     stroke: #a0aec0;
     fill: #a0aec0;
