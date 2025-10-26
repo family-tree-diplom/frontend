@@ -1,13 +1,13 @@
-import { createVuetify } from 'vuetify'
-import * as components from 'vuetify/components'
-import * as directives from 'vuetify/directives'
-
-export default defineNuxtPlugin(nuxtApp => {
-    const vuetify = createVuetify({
-        components,
-        directives,
-        // тут можна налаштовувати тему
-    })
-
-    nuxtApp.vueApp.use(vuetify)
-})
+// import { createVuetify } from 'site/plugins/vuetify.js'
+// import * as components from 'vuetify/components'
+// import * as directives from 'vuetify/directives'
+//
+// export default defineNuxtPlugin(nuxtApp => {
+//     const vuetify = createVuetify({
+//         components,
+//         directives,
+//         // тут можна налаштовувати тему
+//     })
+//
+//     nuxtApp.vueApp.use(vuetify)
+// })
