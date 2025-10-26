@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import { useFamilyData } from '~/composables/useFamilyData';
 import { useDraggable } from '~/composables/useDraggable';
+import { useFamilyLines } from '~/composables/useFamilyLines';
+import { useCamera } from '~/composables/useCamera';
 
 // === Отримуємо дані про людей та зв’язки ===
 const { peoples, relations } = useFamilyData();
@@ -9,17 +11,8 @@ const { peoples, relations } = useFamilyData();
 const boxRefs = ref([]); // посилання на div-блоки (людей)
 const lineRefs = ref([]); // посилання на svg-лінії
 const circleRefs = ref<Record<string, SVGCircleElement>>({});
-const marriageCenters = ref<Record<string, { x: number; y: number }>>({});
 
-// === Реактивні змінні для управління камерою ===
-const camera = reactive({
-    x: 0,
-    y: 0,
-    scale: 1,
-    isDragging: false,
-    startX: 0,
-    startY: 0,
-});
+const { camera, cameraStyle, onWheel, onMouseDown, onMouseMove, onMouseUp } = useCamera();
 
 // === Ключ для збереження позицій у sessionStorage ===
 const STORAGE_KEY = 'family_positions';
@@ -53,179 +46,13 @@ function loadPositions() {
     }
 }
 
-/* ============================================================
-   2️⃣ ДОПОМІЖНІ ФУНКЦІЇ
-   ============================================================ */
-
-// Формує унікальний ключ для пари (наприклад, 3-7)
-function makePairKey(a: number, b: number): string {
-    return [a, b].sort((x, y) => x - y).join('-');
-}
-
-// Знаходить двох батьків для дитини (за її ID)
-function findParentsOf(childId: number) {
-    const parents = relations.value.filter((r) => r.type === 'parent' && r.to === childId).map((r) => r.from);
-    if (parents.length === 2) {
-        const [parentA, parentB] = parents.sort((a, b) => a - b);
-        return { parentA, parentB };
-    }
-    return null;
-}
-
-/* ============================================================
-   3️⃣ ОНОВЛЕННЯ ВСІХ ЛІНІЙ (оптимізована версія)
-   ============================================================ */
-
-function clearDynamicLines() {
-    // очищаем линии, добавленные динамически
-    document.querySelectorAll('.sibling-line, .sibling-child-line, .sibling-connector').forEach((el) => el.remove());
-}
-
-/* === 1️⃣ Лінії шлюбу === */
-function drawMarriageLines() {
-    marriageCenters.value = {};
-
-    relations.value
-        .filter((r) => r.type === 'marriage')
-        .forEach((rel) => {
-            const el1 = boxRefs.value[rel.from];
-            const el2 = boxRefs.value[rel.to];
-            const line = lineRefs.value.find((l) => l?.dataset?.relationKey === `${rel.from}-${rel.to}`) as
-                | SVGLineElement
-                | undefined;
-
-            if (!el1 || !el2 || !line) return;
-
-            const x1 = el1.offsetLeft + el1.offsetWidth / 2;
-            const y1 = el1.offsetTop + el1.offsetHeight / 2;
-            const x2 = el2.offsetLeft + el2.offsetWidth / 2;
-            const y2 = el2.offsetTop + el2.offsetHeight / 2;
-
-            line.setAttribute('x1', String(x1));
-            line.setAttribute('y1', String(y1));
-            line.setAttribute('x2', String(x2));
-            line.setAttribute('y2', String(y2));
-            line.style.display = 'block';
-
-            const cx = (x1 + x2) / 2;
-            const cy = (y1 + y2) / 2;
-
-            const key = makePairKey(rel.from, rel.to);
-            const circle = circleRefs.value[key];
-            if (circle) {
-                circle.setAttribute('cx', String(cx));
-                circle.setAttribute('cy', String(cy));
-            }
-            marriageCenters.value[key] = { x: cx, y: cy };
-        });
-}
-
-/* === 2️⃣ Лінії батьків === */
-function drawParentLines() {
-    relations.value
-        .filter((r) => r.type === 'parent')
-        .forEach((rel) => {
-            const el1 = boxRefs.value[rel.from];
-            const el2 = boxRefs.value[rel.to];
-            const line = lineRefs.value.find((l) => l?.dataset?.relationKey === `${rel.from}-${rel.to}`);
-
-            if (!el1 || !el2 || !line) return;
-
-            const parents = findParentsOf(rel.to);
-            if (parents) {
-                // обидва батьки вже мають спільний зв’язок — ховаємо лінію
-                line.style.display = 'none';
-                return;
-            }
-
-            const x1 = el1.offsetLeft + el1.offsetWidth / 2;
-            const y1 = el1.offsetTop + el1.offsetHeight;
-            const x2 = el2.offsetLeft + el2.offsetWidth / 2;
-            const y2 = el2.offsetTop;
-
-            line.setAttribute('x1', String(x1));
-            line.setAttribute('y1', String(y1));
-            line.setAttribute('x2', String(x2));
-            line.setAttribute('y2', String(y2));
-            line.style.display = 'block';
-        });
-}
-
-/* === 3️⃣ Лінії братів/сестер === */
-function drawSiblingLines() {
-    const siblingGroups: Record<string, number[]> = {};
-
-    relations.value
-        .filter((r) => r.type === 'parent')
-        .forEach((r) => {
-            const parents = findParentsOf(r.to);
-            if (parents) {
-                const key = makePairKey(parents.parentA, parents.parentB);
-                if (!siblingGroups[key]) siblingGroups[key] = [];
-                if (!siblingGroups[key].includes(r.to)) siblingGroups[key].push(r.to);
-            }
-        });
-
-    Object.entries(siblingGroups).forEach(([key, children]) => {
-        const els = children.map((id) => boxRefs.value[id]).filter(Boolean);
-        if (!els.length) return;
-
-        const first = els[0];
-        const last = els[els.length - 1];
-        const x1 = first.offsetLeft + first.offsetWidth / 2;
-        const x2 = last.offsetLeft + last.offsetWidth / 2;
-        const centerX = (x1 + x2) / 2;
-        const yAxis = els.length === 1 ? els[0].offsetTop : Math.min(...els.map((el) => el.offsetTop)) - 40;
-
-        // === вертикаль від шлюбу до осі дітей ===
-        const marriage = marriageCenters.value[key];
-        if (marriage) {
-            const vertLine = document.createElementNS('http://www.w3.org/2000/svg', 'line');
-            vertLine.classList.add('connector-line', 'sibling-connector');
-            vertLine.setAttribute('x1', String(marriage.x));
-            vertLine.setAttribute('y1', String(marriage.y));
-            vertLine.setAttribute('x2', String(centerX));
-            vertLine.setAttribute('y2', String(yAxis));
-            document.querySelector('.line-canvas')?.appendChild(vertLine);
-        }
-
-        // === горизонтальна лінія між братами/сестрами ===
-        const siblingLine = document.createElementNS('http://www.w3.org/2000/svg', 'line');
-        siblingLine.classList.add('connector-line', 'sibling-line');
-        siblingLine.setAttribute('x1', String(x1));
-        siblingLine.setAttribute('y1', String(yAxis));
-        siblingLine.setAttribute('x2', String(x2));
-        siblingLine.setAttribute('y2', String(yAxis));
-        document.querySelector('.line-canvas')?.appendChild(siblingLine);
-
-        // === вертикалі від осі до кожної дитини ===
-        els.forEach((el) => {
-            const childX = el.offsetLeft + el.offsetWidth / 2;
-            const childY = el.offsetTop;
-            const childLine = document.createElementNS('http://www.w3.org/2000/svg', 'line');
-            childLine.classList.add('connector-line', 'sibling-child-line');
-            childLine.setAttribute('x1', String(childX));
-            childLine.setAttribute('y1', String(yAxis));
-            childLine.setAttribute('x2', String(childX));
-            childLine.setAttribute('y2', String(childY));
-            document.querySelector('.line-canvas')?.appendChild(childLine);
-        });
-    });
-}
-
-/* === Основна функція === */
-function updateAllLines() {
-    clearDynamicLines();
-    drawMarriageLines();
-    drawParentLines();
-    drawSiblingLines();
-}
+const { updateAllLines, marriageCenters, makePairKey } = useFamilyLines(boxRefs, lineRefs, circleRefs, relations);
 
 /* ============================================================
    4️⃣ DRAG-LOGІКА ЗІ ЗБЕРЕЖЕННЯМ ПОЗИЦІЙ
    ============================================================ */
 
-const { makeDraggable } = useDraggable(updateAllLines);
+const { makeDraggable } = useDraggable(updateAllLines, camera);
 
 function initDragAndLines() {
     if (process.client) {
@@ -238,7 +65,7 @@ function initDragAndLines() {
             const savedPositions = loadPositions();
 
             // 2️⃣ Чекаємо DOM (бо draggable-box можуть зʼявитися трохи пізніше)
-            setTimeout(() => {
+            setTimeout(async () => {
                 const draggableElements = document.querySelectorAll<HTMLElement>('.draggable-box');
 
                 draggableElements.forEach((el) => {
@@ -259,7 +86,7 @@ function initDragAndLines() {
                 });
 
                 // 3️⃣ Малюємо всі лінії після застосування позицій
-                updateAllLines();
+                await nextTick(updateAllLines);
             }, 50); // невелика пауза, щоб DOM встиг змонтуватися
         });
     }
@@ -273,31 +100,6 @@ function cleanupDrag() {
         el.onmouseup = null;
         el.onmousemove = null;
     });
-}
-// === Обробники для руху камери ===
-function onWheel(e: WheelEvent) {
-    e.preventDefault();
-    const zoomIntensity = 0.1;
-    const delta = e.deltaY < 0 ? 1 + zoomIntensity : 1 - zoomIntensity;
-    const newScale = Math.min(Math.max(camera.scale * delta, 0.2), 3); // обмеження масштабу
-    camera.scale = newScale;
-}
-
-function onMouseDown(e: MouseEvent) {
-    if ((e.target as HTMLElement).closest('.draggable-box')) return; // ігнор якщо тягнемо людину
-    camera.isDragging = true;
-    camera.startX = e.clientX - camera.x;
-    camera.startY = e.clientY - camera.y;
-}
-
-function onMouseMove(e: MouseEvent) {
-    if (!camera.isDragging) return;
-    camera.x = e.clientX - camera.startX;
-    camera.y = e.clientY - camera.startY;
-}
-
-function onMouseUp() {
-    camera.isDragging = false;
 }
 /* ============================================================
    5️⃣ ХУКИ ЖИТТЄВОГО ЦИКЛУ
@@ -342,10 +144,7 @@ watch(
         @mousemove="onMouseMove"
         @mouseup="onMouseUp"
         @mouseleave="onMouseUp"
-        :style="{
-            transform: `translate(${camera.x}px, ${camera.y}px) scale(${camera.scale})`,
-            transformOrigin: '0 0',
-        }"
+        :style="cameraStyle"
     >
         <svg v-if="peoples?.length > 1" class="line-canvas">
             <defs>
