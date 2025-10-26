@@ -1,65 +1,85 @@
-/**
- * Робить елементи перетягуваними з урахуванням масштабу та зсуву камери.
- */
+// composables/useDraggable.ts
 export function useDraggable(updateAllLines: () => void, camera?: any) {
-    let activeElement: HTMLElement | null = null;
+    let activeElement: SVGGElement | null = null;
     let startX = 0;
     let startY = 0;
-    let initialLeft = 0;
-    let initialTop = 0;
+    let initialX = 0;
+    let initialY = 0;
 
-    function onMouseDown(e: MouseEvent) {
-        const target = (e.target as HTMLElement).closest('.draggable-box') as HTMLElement;
+    function getMouseXY(e: PointerEvent) {
+        const scale = camera?.scale ?? 1;
+        const offsetX = camera?.x ?? 0;
+        const offsetY = camera?.y ?? 0;
+        return {
+            x: (e.clientX - offsetX) / scale,
+            y: (e.clientY - offsetY) / scale,
+        };
+    }
+
+    function onPointerDown(e: PointerEvent) {
+        const target = (e.target as HTMLElement).closest('.draggable-card') as SVGGElement | null;
         if (!target) return;
+
+        // Заборона камерi перехоплювати цей drag
+        e.stopPropagation();
+        e.preventDefault();
 
         activeElement = target;
 
-        // Запам’ятовуємо початкові координати миші (з урахуванням камери)
-        startX = (e.clientX - (camera?.x || 0)) / (camera?.scale || 1);
-        startY = (e.clientY - (camera?.y || 0)) / (camera?.scale || 1);
+        const p = getMouseXY(e);
+        startX = p.x;
+        startY = p.y;
 
-        // Поточне положення елемента
-        initialLeft = parseFloat(activeElement.style.left || '0');
-        initialTop = parseFloat(activeElement.style.top || '0');
+        const transform = activeElement.getAttribute('transform');
+        const match = transform?.match(/translate\(([-\d.]+),\s*([-\d.]+)\)/);
+        if (match) {
+            initialX = parseFloat(match[1]);
+            initialY = parseFloat(match[2]);
+        } else {
+            initialX = 0;
+            initialY = 0;
+        }
 
-        document.addEventListener('mousemove', onMouseMove);
-        document.addEventListener('mouseup', onMouseUp);
+        // Захоплюємо pointer, щоб не губити події при швидкому русі
+        (e.target as Element).setPointerCapture?.(e.pointerId);
+
+        document.addEventListener('pointermove', onPointerMove, { passive: false });
+        document.addEventListener('pointerup', onPointerUp, { passive: false });
     }
 
-    function onMouseMove(e: MouseEvent) {
+    function onPointerMove(e: PointerEvent) {
         if (!activeElement) return;
 
-        const scale = camera?.scale || 1;
-        const offsetX = camera?.x || 0;
-        const offsetY = camera?.y || 0;
+        // Не дозволяємо скрол/жести під час drag
+        e.preventDefault();
 
-        // Поточна позиція миші у координатах дерева (з урахуванням transform)
-        const currentX = (e.clientX - offsetX) / scale;
-        const currentY = (e.clientY - offsetY) / scale;
+        const p = getMouseXY(e);
+        const newX = initialX + (p.x - startX);
+        const newY = initialY + (p.y - startY);
 
-        const deltaX = currentX - startX;
-        const deltaY = currentY - startY;
-
-        activeElement.style.left = `${initialLeft + deltaX}px`;
-        activeElement.style.top = `${initialTop + deltaY}px`;
-
+        activeElement.setAttribute('transform', `translate(${newX}, ${newY})`);
         updateAllLines();
     }
 
-    function onMouseUp() {
+    function onPointerUp(e: PointerEvent) {
         if (!activeElement) return;
+        (e.target as Element)?.releasePointerCapture?.(e.pointerId);
         activeElement = null;
-        document.removeEventListener('mousemove', onMouseMove);
-        document.removeEventListener('mouseup', onMouseUp);
+
+        document.removeEventListener('pointermove', onPointerMove);
+        document.removeEventListener('pointerup', onPointerUp);
     }
 
-    function makeDraggable(el: HTMLElement) {
-        el.addEventListener('mousedown', onMouseDown);
+    function makeDraggable(el: SVGGElement) {
+        // capture:true — щоб наш handler спрацьовував перед панорамуванням камери
+        el.addEventListener('pointerdown', onPointerDown, { capture: true });
+        // На всяк випадок вмикаємо курсор:
+        el.style.cursor = 'grab';
     }
 
     onBeforeUnmount(() => {
-        document.removeEventListener('mousemove', onMouseMove);
-        document.removeEventListener('mouseup', onMouseUp);
+        document.removeEventListener('pointermove', onPointerMove);
+        document.removeEventListener('pointerup', onPointerUp);
     });
 
     return { makeDraggable };

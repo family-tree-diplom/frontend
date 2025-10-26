@@ -1,75 +1,72 @@
-/**
- * Варіант 2: Батьки → точка шлюбу → діти
- * - Пряму батьківську лінію ховаємо, якщо у дитини є двоє батьків
- * - Малюємо лінію між батьками (шлюб)
- * - Від точки шлюбу вертикаль до «осі дітей», горизонталь між дітьми,
- *   та вертикалі від осі до кожної дитини
- */
+// composables/useFamilyLines.ts
 export function useFamilyLines(boxRefs, lineRefs, circleRefs, relations) {
-    // Центри шлюбів (для побудови вертикалі до осі дітей)
     const marriageCenters = ref<Record<string, { x: number; y: number }>>({});
 
-    /* =================== Утиліти =================== */
-
-    // Стабільний ключ для пари (напр., "3-7")
     function makePairKey(a: number, b: number): string {
         return [a, b].sort((x, y) => x - y).join('-');
     }
 
-    // Пошук обох батьків дитини
     function findParentsOf(childId: number) {
-        const parents = relations.value.filter((r) => r.type === 'parent' && r.to === childId).map((r) => r.from);
+        const parents = relations.value
+            .filter((r) => r.type === 'parent' && r.to === childId)
+            .map((r) => r.from);
         if (parents.length === 2) {
-            const [parentA, parentB] = parents.sort((a, b) => a - b);
-            return { parentA, parentB };
+            const [p1, p2] = parents.sort((a, b) => a - b);
+            return { parentA: p1, parentB: p2 };
         }
         return null;
     }
 
-    // Безпечне очищення тимчасових ліній (тільки динамічно створюваних)
     function clearDynamicLines() {
-        document
-            .querySelectorAll('.sibling-line, .sibling-child-line, .sibling-connector')
+        document.querySelectorAll('.sibling-line, .sibling-child-line, .sibling-connector')
             .forEach((el) => el.remove());
     }
 
-    // Знаходимо <line> у шаблоні за ключем from-to
     function getLineByKey(from: number, to: number): SVGLineElement | undefined {
         const key = `${from}-${to}`;
-        return lineRefs.value.find((l: SVGLineElement) => l?.dataset?.relationKey === key) as
-            | SVGLineElement
-            | undefined;
+        return lineRefs.value.find((l: SVGLineElement) => l?.dataset?.relationKey === key);
     }
 
-    /* =================== Шлюбні лінії =================== */
+    // === Утиліта для обчислення абсолютних координат центру <g> ===
+    function getCenter(el: SVGGElement) {
+        const bbox = el.getBBox();
+        const transform = el.getAttribute('transform');
+        let tx = 0, ty = 0;
+        const match = transform?.match(/translate\(([-\d.]+),\s*([-\d.]+)\)/);
+        if (match) {
+            tx = parseFloat(match[1]);
+            ty = parseFloat(match[2]);
+        }
+        return {
+            x: tx + bbox.x + bbox.width / 2,
+            y: ty + bbox.y + bbox.height / 2,
+            top: ty + bbox.y,
+            bottom: ty + bbox.y + bbox.height,
+        };
+    }
+
+    /* =================== ШЛЮБ =================== */
     function drawMarriageLines() {
         marriageCenters.value = {};
-
         relations.value
             .filter((r) => r.type === 'marriage')
             .forEach((rel) => {
                 const el1 = boxRefs.value[rel.from];
                 const el2 = boxRefs.value[rel.to];
                 const line = getLineByKey(rel.from, rel.to);
-
                 if (!el1 || !el2 || !line) return;
 
-                // Центри карток батьків
-                const x1 = el1.offsetLeft + el1.offsetWidth / 2;
-                const y1 = el1.offsetTop + el1.offsetHeight / 2;
-                const x2 = el2.offsetLeft + el2.offsetWidth / 2;
-                const y2 = el2.offsetTop + el2.offsetHeight / 2;
+                const p1 = getCenter(el1);
+                const p2 = getCenter(el2);
 
-                // Лінія між батьками (шлюб)
-                line.setAttribute('x1', String(x1));
-                line.setAttribute('y1', String(y1));
-                line.setAttribute('x2', String(x2));
-                line.setAttribute('y2', String(y2));
+                line.setAttribute('x1', String(p1.x));
+                line.setAttribute('y1', String(p1.y));
+                line.setAttribute('x2', String(p2.x));
+                line.setAttribute('y2', String(p2.y));
                 line.style.display = 'block';
 
-                // Центр шлюбної лінії (для точки шлюбу + побудови осі дітей)
-                const cx = (x1 + x2) / 2;
-                const cy = (y1 + y2) / 2;
+                const cx = (p1.x + p2.x) / 2;
+                const cy = (p1.y + p2.y) / 2;
 
                 const key = makePairKey(rel.from, rel.to);
                 const circle = circleRefs.value[key];
@@ -81,7 +78,7 @@ export function useFamilyLines(boxRefs, lineRefs, circleRefs, relations) {
             });
     }
 
-    /* =================== Батьківські лінії =================== */
+    /* =================== БАТЬКИ =================== */
     function drawParentLines() {
         relations.value
             .filter((r) => r.type === 'parent')
@@ -89,35 +86,29 @@ export function useFamilyLines(boxRefs, lineRefs, circleRefs, relations) {
                 const el1 = boxRefs.value[rel.from];
                 const el2 = boxRefs.value[rel.to];
                 const line = getLineByKey(rel.from, rel.to);
-
                 if (!el1 || !el2 || !line) return;
 
-                // ВАРІАНТ 2: якщо у дитини двоє батьків — не малюємо пряму лінію батько/мати → дитина
                 const parents = findParentsOf(rel.to);
                 if (parents) {
                     line.style.display = 'none';
                     return;
                 }
 
-                // Якщо один із батьків відсутній — тоді малюємо пряму батьківську лінію
-                const x1 = el1.offsetLeft + el1.offsetWidth / 2;
-                const y1 = el1.offsetTop + el1.offsetHeight;
-                const x2 = el2.offsetLeft + el2.offsetWidth / 2;
-                const y2 = el2.offsetTop;
+                const p1 = getCenter(el1);
+                const p2 = getCenter(el2);
 
-                line.setAttribute('x1', String(x1));
-                line.setAttribute('y1', String(y1));
-                line.setAttribute('x2', String(x2));
-                line.setAttribute('y2', String(y2));
+                line.setAttribute('x1', String(p1.x));
+                line.setAttribute('y1', String(p1.bottom));
+                line.setAttribute('x2', String(p2.x));
+                line.setAttribute('y2', String(p2.top));
                 line.style.display = 'block';
             });
     }
 
-    /* =========== Вісь і вертикалі між братами/сестрами =========== */
+    /* =================== ДІТИ / БРАТИ / СЕСТРИ =================== */
     function drawSiblingLines() {
         const siblingGroups: Record<string, number[]> = {};
 
-        // Групуємо дітей за парою батьків
         relations.value
             .filter((r) => r.type === 'parent')
             .forEach((r) => {
@@ -133,15 +124,15 @@ export function useFamilyLines(boxRefs, lineRefs, circleRefs, relations) {
             const els = children.map((id) => boxRefs.value[id]).filter(Boolean);
             if (!els.length) return;
 
-            // Координати «осі дітей»
-            const first = els[0];
-            const last = els[els.length - 1];
-            const x1 = first.offsetLeft + first.offsetWidth / 2;
-            const x2 = last.offsetLeft + last.offsetWidth / 2;
-            const centerX = (x1 + x2) / 2;
-            const yAxis = els.length === 1 ? els[0].offsetTop : Math.min(...els.map((el) => el.offsetTop)) - 40;
+            const centers = els.map((el) => getCenter(el));
+            const first = centers[0];
+            const last = centers[centers.length - 1];
 
-            // Вертикаль від точки шлюбу до осі дітей
+            const x1 = first.x;
+            const x2 = last.x;
+            const centerX = (x1 + x2) / 2;
+            const yAxis = Math.min(...centers.map((c) => c.top)) - 40;
+
             const marriage = marriageCenters.value[key];
             if (marriage) {
                 const vertLine = document.createElementNS('http://www.w3.org/2000/svg', 'line');
@@ -153,7 +144,6 @@ export function useFamilyLines(boxRefs, lineRefs, circleRefs, relations) {
                 document.querySelector('.line-canvas')?.appendChild(vertLine);
             }
 
-            // Горизонтальна вісь між дітьми
             const siblingLine = document.createElementNS('http://www.w3.org/2000/svg', 'line');
             siblingLine.classList.add('connector-line', 'sibling-line');
             siblingLine.setAttribute('x1', String(x1));
@@ -162,22 +152,18 @@ export function useFamilyLines(boxRefs, lineRefs, circleRefs, relations) {
             siblingLine.setAttribute('y2', String(yAxis));
             document.querySelector('.line-canvas')?.appendChild(siblingLine);
 
-            // Короткі вертикалі від осі до кожної дитини
-            els.forEach((el) => {
-                const childX = el.offsetLeft + el.offsetWidth / 2;
-                const childY = el.offsetTop;
+            centers.forEach((c) => {
                 const childLine = document.createElementNS('http://www.w3.org/2000/svg', 'line');
                 childLine.classList.add('connector-line', 'sibling-child-line');
-                childLine.setAttribute('x1', String(childX));
+                childLine.setAttribute('x1', String(c.x));
                 childLine.setAttribute('y1', String(yAxis));
-                childLine.setAttribute('x2', String(childX));
-                childLine.setAttribute('y2', String(childY));
+                childLine.setAttribute('x2', String(c.x));
+                childLine.setAttribute('y2', String(c.top));
                 document.querySelector('.line-canvas')?.appendChild(childLine);
             });
         });
     }
 
-    /* =================== Основна функція =================== */
     function updateAllLines() {
         clearDynamicLines();
         drawMarriageLines();

@@ -8,39 +8,41 @@ import { useCamera } from '~/composables/useCamera';
 const { peoples, relations } = useFamilyData();
 
 // === Реактивні змінні для посилань на DOM-елементи ===
-const boxRefs = ref([]); // посилання на div-блоки (людей)
-const lineRefs = ref([]); // посилання на svg-лінії
+const boxRefs = ref<Record<number, SVGGElement>>({});
+const lineRefs = ref([]);
 const circleRefs = ref<Record<string, SVGCircleElement>>({});
 
 const { camera, cameraStyle, onWheel, onMouseDown, onMouseMove, onMouseUp } = useCamera();
 
 // === Ключ для збереження позицій у sessionStorage ===
-const STORAGE_KEY = 'family_positions';
+const STORAGE_KEY = 'family_positions_svg';
 
 /* ============================================================
-   1️⃣ ЗБЕРЕЖЕННЯ ТА ВІДНОВЛЕННЯ ПОЗИЦІЙ
+    ЗБЕРЕЖЕННЯ ТА ВІДНОВЛЕННЯ ПОЗИЦІЙ
    ============================================================ */
 
-// Зберігає поточні координати draggable-карток у sessionStorage
 function savePositions() {
-    const positions: Record<number, { top: number; left: number }> = {};
-    boxRefs.value.forEach((el: HTMLElement, id: number) => {
+    const positions: Record<number, { x: number; y: number }> = {};
+    Object.entries(boxRefs.value).forEach(([id, el]) => {
         if (el) {
-            positions[id] = {
-                top: el.offsetTop,
-                left: el.offsetLeft,
-            };
+            const transform = el.getAttribute('transform');
+            if (transform) {
+                const match = transform.match(/translate\(([-\d.]+),\s*([-\d.]+)\)/);
+                if (match) {
+                    const [, x, y] = match;
+                    positions[Number(id)] = { x: parseFloat(x), y: parseFloat(y) };
+                }
+            }
         }
     });
     sessionStorage.setItem(STORAGE_KEY, JSON.stringify(positions));
 }
 
-// Завантажує позиції з sessionStorage
 function loadPositions() {
     const raw = sessionStorage.getItem(STORAGE_KEY);
     if (!raw) return {};
     try {
-        return JSON.parse(raw) as Record<number, { top: number; left: number }>;
+        return JSON.parse(raw) as Record<number, { x: number; y: number }>;
     } catch {
         return {};
     }
@@ -49,7 +51,7 @@ function loadPositions() {
 const { updateAllLines, marriageCenters, makePairKey } = useFamilyLines(boxRefs, lineRefs, circleRefs, relations);
 
 /* ============================================================
-   4️⃣ DRAG-LOGІКА ЗІ ЗБЕРЕЖЕННЯМ ПОЗИЦІЙ
+    DRAG-ЛОГІКА ЗІ ЗБЕРЕЖЕННЯМ ПОЗИЦІЙ
    ============================================================ */
 
 const { makeDraggable } = useDraggable(updateAllLines, camera);
@@ -57,63 +59,53 @@ const { makeDraggable } = useDraggable(updateAllLines, camera);
 function initDragAndLines() {
     if (process.client) {
         nextTick(() => {
-            boxRefs.value = [];
+            boxRefs.value = {};
             lineRefs.value = [];
             circleRefs.value = {};
 
-            // 1️⃣ Завантажуємо збережені координати з sessionStorage
             const savedPositions = loadPositions();
 
-            // 2️⃣ Чекаємо DOM (бо draggable-box можуть зʼявитися трохи пізніше)
             setTimeout(async () => {
-                const draggableElements = document.querySelectorAll<HTMLElement>('.draggable-box');
+                const draggableElements = document.querySelectorAll<SVGGElement>('.draggable-card');
 
                 draggableElements.forEach((el) => {
-                    // Отримуємо ID з вмісту блоку
-                    const idText = el.querySelector('small:last-child')?.textContent;
-                    const id = idText ? Number(idText.trim()) : NaN;
+                    const idAttr = el.getAttribute('data-id');
+                    const id = idAttr ? Number(idAttr) : NaN;
 
-                    // Якщо є позиція в sessionStorage — застосовуємо
                     if (!isNaN(id) && savedPositions[id]) {
                         const pos = savedPositions[id];
-                        el.style.position = 'absolute';
-                        el.style.top = `${pos.top}px`;
-                        el.style.left = `${pos.left}px`;
+                        el.setAttribute('transform', `translate(${pos.x}, ${pos.y})`);
                     }
 
-                    // Робимо елемент перетягуваним
                     makeDraggable(el);
                 });
 
-                // 3️⃣ Малюємо всі лінії після застосування позицій
                 await nextTick(updateAllLines);
-            }, 50); // невелика пауза, щоб DOM встиг змонтуватися
+            }, 50);
         });
     }
 }
 
-// Очищаємо події при демонтажі
 function cleanupDrag() {
-    const draggableElements = document.querySelectorAll<HTMLElement>('.draggable-box');
+    const draggableElements = document.querySelectorAll<SVGGElement>('.draggable-card');
     draggableElements.forEach((el) => {
         el.onmousedown = null;
         el.onmouseup = null;
         el.onmousemove = null;
     });
 }
+
 /* ============================================================
-   5️⃣ ХУКИ ЖИТТЄВОГО ЦИКЛУ
+    ХУКИ ЖИТТЄВОГО ЦИКЛУ
    ============================================================ */
 
 onMounted(initDragAndLines);
 onBeforeUnmount(cleanupDrag);
 
-// Зберігаємо позиції перед закриттям/оновленням сторінки
 if (process.client) {
     window.addEventListener('beforeunload', savePositions);
 }
 
-// При оновленні hot-reload — перевстановлюємо drag & lines
 if (import.meta.hot) {
     import.meta.hot.accept(() => {
         nextTick(() => {
@@ -123,7 +115,6 @@ if (import.meta.hot) {
     });
 }
 
-// Якщо змінюється peoples — перезапускаємо ініціалізацію
 watch(
     peoples,
     (newPeoples) => {
@@ -136,7 +127,6 @@ watch(
 </script>
 
 <template>
-    <!--    <pre>{{peoples}}</pre>-->
     <div
         class="main-container viewport"
         @wheel="onWheel"
@@ -152,7 +142,10 @@ watch(
                     <path d="M 20 0 L 0 0 0 20" fill="none" stroke="#e2e8f0" stroke-width="0.5" />
                 </pattern>
             </defs>
+
             <rect width="100%" height="100%" fill="url(#grid)" />
+
+            <!-- Лінії між людьми -->
             <line
                 v-for="(relation, index) in relations"
                 :key="`${relation.from}-${relation.to}`"
@@ -160,6 +153,7 @@ watch(
                 class="connector-line"
                 :data-relation-key="`${relation.from}-${relation.to}`"
             />
+            <!-- Кола для шлюбів -->
             <circle
                 v-for="(relation, index) in relations.filter((r) => r.type === 'marriage')"
                 :key="index"
@@ -167,19 +161,53 @@ watch(
                 r="6"
                 class="connector-circle"
             />
-        </svg>
 
-        <div
-            v-for="(person, index) in peoples"
-            :key="person.id"
-            :ref="(el) => (boxRefs[person.id] = el)"
-            class="draggable-box"
-            :style="{ top: `${100 + index * 80}px`, left: `${150 + index * 100}px` }"
-        >
-            <div class="drag-handle">{{ person.surname }}</div>
-            <small>{{ person.name }}</small>
-            <small>{{ person.id }}</small>
-        </div>
+            <!-- SVG-картки людей -->
+            <g
+                v-for="(person, index) in peoples"
+                :key="person.id"
+                :data-id="person.id"
+                :ref="(el) => (boxRefs[person.id] = el)"
+                class="draggable-card"
+                :transform="`translate(${150 + index * 150}, ${100 + index * 100})`"
+                pointer-events="all"
+            >
+                <rect
+                    width="200"
+                    height="80"
+                    rx="8"
+                    ry="8"
+                    fill="white"
+                    stroke="#ddd"
+                    stroke-width="1.5"
+                    pointer-events="all"
+                />
+
+                <!-- Заголовок -->
+                <rect x="0" y="0" width="200" height="30" fill="#2d3748" rx="8" ry="8"></rect>
+                <text
+                    x="100"
+                    y="20"
+                    text-anchor="middle"
+                    fill="white"
+                    font-weight="bold"
+                    font-size="14"
+                    class="drag-handle"
+                >
+                    {{ person.surname }}
+                </text>
+
+                <!-- Ім’я -->
+                <text x="100" y="50" text-anchor="middle" fill="#4a5568" font-size="12">
+                    {{ person.name }}
+                </text>
+
+                <!-- ID -->
+                <text x="100" y="65" text-anchor="middle" fill="#718096" font-size="10">
+                    {{ person.id }}
+                </text>
+            </g>
+        </svg>
     </div>
 </template>
 
@@ -203,37 +231,6 @@ watch(
     transition: transform 0.02s linear;
 }
 
-.draggable-box {
-    width: 200px;
-    padding-bottom: 10px;
-    background-color: #fff;
-    border: 1px solid #ddd;
-    border-radius: 8px;
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
-    text-align: center;
-    z-index: 10;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-}
-
-.drag-handle {
-    width: 100%;
-    padding: 10px;
-    background-color: #2d3748;
-    color: white;
-    font-weight: bold;
-    cursor: grab;
-    border-top-left-radius: 8px;
-    border-top-right-radius: 8px;
-}
-
-.draggable-box small {
-    margin-top: 8px;
-    color: #718096;
-}
-
 .line-canvas {
     width: 100%;
     height: 100%;
@@ -249,5 +246,14 @@ watch(
     stroke: #a0aec0;
     fill: #a0aec0;
     stroke-width: 2px;
+}
+
+.draggable-card {
+    cursor: grab;
+    user-select: none;
+}
+
+.draggable-card:active {
+    cursor: grabbing;
 }
 </style>
