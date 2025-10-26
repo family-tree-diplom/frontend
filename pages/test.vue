@@ -73,20 +73,29 @@ function findParentsOf(childId: number) {
 }
 
 /* ============================================================
-   3️⃣ ОНОВЛЕННЯ ВСІХ ЛІНІЙ
+   3️⃣ ОНОВЛЕННЯ ВСІХ ЛІНІЙ (оптимізована версія)
    ============================================================ */
 
-const updateAllLines = () => {
+function clearDynamicLines() {
+    // очищаем линии, добавленные динамически
+    document.querySelectorAll('.sibling-line, .sibling-child-line, .sibling-connector').forEach((el) => el.remove());
+}
+
+/* === 1️⃣ Лінії шлюбу === */
+function drawMarriageLines() {
     marriageCenters.value = {};
 
-    relations.value.forEach((rel, i) => {
-        const el1 = boxRefs.value[rel.from] as HTMLElement;
-        const el2 = boxRefs.value[rel.to] as HTMLElement;
-        const line = lineRefs.value[i] as SVGLineElement;
-        if (!line || !rel.type || !el1 || !el2) return;
+    relations.value
+        .filter((r) => r.type === 'marriage')
+        .forEach((rel) => {
+            const el1 = boxRefs.value[rel.from];
+            const el2 = boxRefs.value[rel.to];
+            const line = lineRefs.value.find((l) => l?.dataset?.relationKey === `${rel.from}-${rel.to}`) as
+                | SVGLineElement
+                | undefined;
 
-        // === Малювання ліній шлюбу ===
-        if (rel.type === 'marriage') {
+            if (!el1 || !el2 || !line) return;
+
             const x1 = el1.offsetLeft + el1.offsetWidth / 2;
             const y1 = el1.offsetTop + el1.offsetHeight / 2;
             const x2 = el2.offsetLeft + el2.offsetWidth / 2;
@@ -108,35 +117,44 @@ const updateAllLines = () => {
                 circle.setAttribute('cy', String(cy));
             }
             marriageCenters.value[key] = { x: cx, y: cy };
-        }
+        });
+}
 
-        // === Малювання ліній батьківських зв’язків ===
-        else if (rel.type === 'parent') {
+/* === 2️⃣ Лінії батьків === */
+function drawParentLines() {
+    relations.value
+        .filter((r) => r.type === 'parent')
+        .forEach((rel) => {
+            const el1 = boxRefs.value[rel.from];
+            const el2 = boxRefs.value[rel.to];
+            const line = lineRefs.value.find((l) => l?.dataset?.relationKey === `${rel.from}-${rel.to}`);
+
+            if (!el1 || !el2 || !line) return;
+
             const parents = findParentsOf(rel.to);
             if (parents) {
-                line.style.display = 'none'; // ховаємо, якщо є обидва батьки
-            } else {
-                const x1 = el1.offsetLeft + el1.offsetWidth / 2;
-                const y1 = el1.offsetTop + el1.offsetHeight;
-                const x2 = el2.offsetLeft + el2.offsetWidth / 2;
-                const y2 = el2.offsetTop;
-
-                line.setAttribute('x1', String(x1));
-                line.setAttribute('y1', String(y1));
-                line.setAttribute('x2', String(x2));
-                line.setAttribute('y2', String(y2));
-                line.style.display = 'block';
+                // обидва батьки вже мають спільний зв’язок — ховаємо лінію
+                line.style.display = 'none';
+                return;
             }
-        }
 
-        // Якщо тип невідомий — ховаємо
-        else {
-            line.style.display = 'none';
-        }
-    });
+            const x1 = el1.offsetLeft + el1.offsetWidth / 2;
+            const y1 = el1.offsetTop + el1.offsetHeight;
+            const x2 = el2.offsetLeft + el2.offsetWidth / 2;
+            const y2 = el2.offsetTop;
 
-    /* === Малювання горизонтальних і вертикальних осей між дітьми === */
+            line.setAttribute('x1', String(x1));
+            line.setAttribute('y1', String(y1));
+            line.setAttribute('x2', String(x2));
+            line.setAttribute('y2', String(y2));
+            line.style.display = 'block';
+        });
+}
+
+/* === 3️⃣ Лінії братів/сестер === */
+function drawSiblingLines() {
     const siblingGroups: Record<string, number[]> = {};
+
     relations.value
         .filter((r) => r.type === 'parent')
         .forEach((r) => {
@@ -144,70 +162,64 @@ const updateAllLines = () => {
             if (parents) {
                 const key = makePairKey(parents.parentA, parents.parentB);
                 if (!siblingGroups[key]) siblingGroups[key] = [];
-                if (!siblingGroups[key].includes(r.to)) {
-                    siblingGroups[key].push(r.to);
-                }
+                if (!siblingGroups[key].includes(r.to)) siblingGroups[key].push(r.to);
             }
         });
 
     Object.entries(siblingGroups).forEach(([key, children]) => {
         const els = children.map((id) => boxRefs.value[id]).filter(Boolean);
-        if (els.length === 0) return;
+        if (!els.length) return;
 
         const first = els[0];
         const last = els[els.length - 1];
         const x1 = first.offsetLeft + first.offsetWidth / 2;
         const x2 = last.offsetLeft + last.offsetWidth / 2;
         const centerX = (x1 + x2) / 2;
-        let yAxis: number = els.length === 1 ? els[0].offsetTop : Math.min(...els.map((el) => el.offsetTop)) - 40;
+        const yAxis = els.length === 1 ? els[0].offsetTop : Math.min(...els.map((el) => el.offsetTop)) - 40;
 
+        // === вертикаль від шлюбу до осі дітей ===
         const marriage = marriageCenters.value[key];
         if (marriage) {
-            let vertLine = document.querySelector(`line[data-marriage-to-sibling="${key}"]`) as SVGLineElement;
-            if (!vertLine) {
-                vertLine = document.createElementNS('http://www.w3.org/2000/svg', 'line');
-                vertLine.classList.add('connector-line', 'sibling-connector');
-                vertLine.dataset.marriageToSibling = key;
-                document.querySelector('.line-canvas')?.appendChild(vertLine);
-            }
+            const vertLine = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+            vertLine.classList.add('connector-line', 'sibling-connector');
             vertLine.setAttribute('x1', String(marriage.x));
             vertLine.setAttribute('y1', String(marriage.y));
             vertLine.setAttribute('x2', String(centerX));
             vertLine.setAttribute('y2', String(yAxis));
+            document.querySelector('.line-canvas')?.appendChild(vertLine);
         }
 
-        let siblingLine = document.querySelector(`line[data-sibling="${key}"]`) as SVGLineElement;
-        if (!siblingLine) {
-            siblingLine = document.createElementNS('http://www.w3.org/2000/svg', 'line');
-            siblingLine.classList.add('connector-line', 'sibling-line');
-            siblingLine.dataset.sibling = key;
-            document.querySelector('.line-canvas')?.appendChild(siblingLine);
-        }
+        // === горизонтальна лінія між братами/сестрами ===
+        const siblingLine = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+        siblingLine.classList.add('connector-line', 'sibling-line');
         siblingLine.setAttribute('x1', String(x1));
         siblingLine.setAttribute('y1', String(yAxis));
         siblingLine.setAttribute('x2', String(x2));
         siblingLine.setAttribute('y2', String(yAxis));
+        document.querySelector('.line-canvas')?.appendChild(siblingLine);
 
-        children.forEach((childId, index) => {
-            const childEl = els[index];
-            if (!childEl) return;
-            const childX = childEl.offsetLeft + childEl.offsetWidth / 2;
-            const childY = childEl.offsetTop;
-            const keyChild = `${key}-${childId}`;
-            let childLine = document.querySelector(`line[data-sibling-child="${keyChild}"]`) as SVGLineElement;
-            if (!childLine) {
-                childLine = document.createElementNS('http://www.w3.org/2000/svg', 'line');
-                childLine.classList.add('connector-line', 'sibling-child-line');
-                childLine.dataset.siblingChild = keyChild;
-                document.querySelector('.line-canvas')?.appendChild(childLine);
-            }
+        // === вертикалі від осі до кожної дитини ===
+        els.forEach((el) => {
+            const childX = el.offsetLeft + el.offsetWidth / 2;
+            const childY = el.offsetTop;
+            const childLine = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+            childLine.classList.add('connector-line', 'sibling-child-line');
             childLine.setAttribute('x1', String(childX));
             childLine.setAttribute('y1', String(yAxis));
             childLine.setAttribute('x2', String(childX));
             childLine.setAttribute('y2', String(childY));
+            document.querySelector('.line-canvas')?.appendChild(childLine);
         });
     });
-};
+}
+
+/* === Основна функція === */
+function updateAllLines() {
+    clearDynamicLines();
+    drawMarriageLines();
+    drawParentLines();
+    drawSiblingLines();
+}
 
 /* ============================================================
    4️⃣ DRAG-LOGІКА ЗІ ЗБЕРЕЖЕННЯМ ПОЗИЦІЙ
@@ -323,50 +335,53 @@ watch(
 
 <template>
     <!--    <pre>{{peoples}}</pre>-->
-    <div class="main-container viewport"
-         @wheel="onWheel"
-         @mousedown="onMouseDown"
-         @mousemove="onMouseMove"
-         @mouseup="onMouseUp"
-         @mouseleave="onMouseUp"
-         :style="{
-                transform: `translate(${camera.x}px, ${camera.y}px) scale(${camera.scale})`,
-                transformOrigin: '0 0',
-            }">
-            <svg v-if="peoples?.length > 1" class="line-canvas">
-                <defs>
-                    <pattern id="grid" width="20" height="20" patternUnits="userSpaceOnUse">
-                        <path d="M 20 0 L 0 0 0 20" fill="none" stroke="#e2e8f0" stroke-width="0.5" />
-                    </pattern>
-                </defs>
-                <rect width="100%" height="100%" fill="url(#grid)" />
-                <line
-                    v-for="(relation, index) in relations"
-                    :key="`${relation.from}-${relation.to}`"
-                    :ref="(el) => (lineRefs[index] = el)"
-                    class="connector-line"
-                />
-                <circle
-                    v-for="(relation, index) in relations.filter((r) => r.type === 'marriage')"
-                    :key="index"
-                    :ref="(el) => (circleRefs[makePairKey(relation.from, relation.to)] = el)"
-                    r="6"
-                    class="connector-circle"
-                />
-            </svg>
+    <div
+        class="main-container viewport"
+        @wheel="onWheel"
+        @mousedown="onMouseDown"
+        @mousemove="onMouseMove"
+        @mouseup="onMouseUp"
+        @mouseleave="onMouseUp"
+        :style="{
+            transform: `translate(${camera.x}px, ${camera.y}px) scale(${camera.scale})`,
+            transformOrigin: '0 0',
+        }"
+    >
+        <svg v-if="peoples?.length > 1" class="line-canvas">
+            <defs>
+                <pattern id="grid" width="20" height="20" patternUnits="userSpaceOnUse">
+                    <path d="M 20 0 L 0 0 0 20" fill="none" stroke="#e2e8f0" stroke-width="0.5" />
+                </pattern>
+            </defs>
+            <rect width="100%" height="100%" fill="url(#grid)" />
+            <line
+                v-for="(relation, index) in relations"
+                :key="`${relation.from}-${relation.to}`"
+                :ref="(el) => (lineRefs[index] = el)"
+                class="connector-line"
+                :data-relation-key="`${relation.from}-${relation.to}`"
+            />
+            <circle
+                v-for="(relation, index) in relations.filter((r) => r.type === 'marriage')"
+                :key="index"
+                :ref="(el) => (circleRefs[makePairKey(relation.from, relation.to)] = el)"
+                r="6"
+                class="connector-circle"
+            />
+        </svg>
 
-            <div
-                v-for="(person, index) in peoples"
-                :key="person.id"
-                :ref="(el) => (boxRefs[person.id] = el)"
-                class="draggable-box"
-                :style="{ top: `${100 + index * 80}px`, left: `${150 + index * 100}px` }"
-            >
-                <div class="drag-handle">{{ person.surname }}</div>
-                <small>{{ person.name }}</small>
-                <small>{{ person.id }}</small>
-            </div>
+        <div
+            v-for="(person, index) in peoples"
+            :key="person.id"
+            :ref="(el) => (boxRefs[person.id] = el)"
+            class="draggable-box"
+            :style="{ top: `${100 + index * 80}px`, left: `${150 + index * 100}px` }"
+        >
+            <div class="drag-handle">{{ person.surname }}</div>
+            <small>{{ person.name }}</small>
+            <small>{{ person.id }}</small>
         </div>
+    </div>
 </template>
 
 <style>
