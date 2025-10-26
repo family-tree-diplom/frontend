@@ -121,15 +121,7 @@ if (import.meta.hot) {
 </script>
 
 <template>
-    <div
-        class="main-container viewport"
-        @wheel="onWheel"
-        @mousedown="onMouseDown"
-        @mousemove="onMouseMove"
-        @mouseup="onMouseUp"
-        @mouseleave="onMouseUp"
-        :style="cameraStyle"
-    >
+    <div class="main-container viewport" :style="cameraStyle">
         <svg v-if="peoples?.length > 1" class="line-canvas">
             <defs>
                 <pattern id="grid" width="20" height="20" patternUnits="userSpaceOnUse">
