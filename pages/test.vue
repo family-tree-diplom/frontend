@@ -121,62 +121,81 @@ if (import.meta.hot) {
 </script>
 
 <template>
-    <div class="main-container viewport" :style="cameraStyle">
-        <svg v-if="peoples?.length > 1" class="line-canvas">
-            <defs>
-                <pattern id="grid" width="20" height="20" patternUnits="userSpaceOnUse">
-                    <path d="M 20 0 L 0 0 0 20" fill="none" stroke="#e2e8f0" stroke-width="0.5" />
-                </pattern>
-            </defs>
-            <rect width="100%" height="100%" fill="url(#grid)" />
-            <line
-                v-for="(relation, index) in relations"
-                :key="`${relation.from}-${relation.to}`"
-                :ref="(el) => (lineRefs[index] = el)"
-                class="connector-line"
-                :data-relation-key="`${relation.from}-${relation.to}`"
-            />
-            <circle
-                v-for="(relation, index) in relations.filter((r) => r.type === 'marriage')"
-                :key="index"
-                :ref="(el) => (circleRefs[makePairKey(relation.from, relation.to)] = el)"
-                r="6"
-                class="connector-circle"
-            />
-        </svg>
+    <div
+        class="viewport"
+        @wheel.prevent="onWheel"
+        @mousedown="onMouseDown"
+        @mousemove="onMouseMove"
+        @mouseup="onMouseUp"
+        @mouseleave="onMouseUp"
+    >
+        <div class="main-container" :style="cameraStyle">
+            <svg v-if="peoples?.length > 1" class="line-canvas">
+                <defs>
+                    <pattern id="grid" width="20" height="20" patternUnits="userSpaceOnUse">
+                        <path d="M 20 0 L 0 0 0 20" fill="none" stroke="#e2e8f0" stroke-width="0.5" />
+                    </pattern>
+                </defs>
+                <rect width="100%" height="100%" fill="url(#grid)" />
+                <line
+                    v-for="(relation, index) in relations"
+                    :key="`${relation.from}-${relation.to}`"
+                    :ref="(el) => (lineRefs[index] = el)"
+                    class="connector-line"
+                    :data-relation-key="`${relation.from}-${relation.to}`"
+                />
+                <circle
+                    v-for="(relation, index) in relations.filter((r) => r.type === 'marriage')"
+                    :key="index"
+                    :ref="(el) => (circleRefs[makePairKey(relation.from, relation.to)] = el)"
+                    r="6"
+                    class="connector-circle"
+                />
+            </svg>
 
-        <div
-            v-for="(person, index) in peoples"
-            :key="person.id"
-            :ref="(el) => (boxRefs[person.id] = el)"
-            class="draggable-box"
-            :style="{ transform: `translate(${positions[person.id]?.x ?? 0}px, ${positions[person.id]?.y ?? 0}px)` }"
-        >
-            <div class="drag-handle">{{ person.surname }}</div>
-            <small>{{ person.name }}</small>
-            <small>{{ person.id }}</small>
+            <div
+                v-for="(person, index) in peoples"
+                :key="person.id"
+                :ref="(el) => (boxRefs[person.id] = el)"
+                class="draggable-box"
+                :style="{
+                    transform: `translate(${positions[person.id]?.x ?? 0}px, ${positions[person.id]?.y ?? 0}px)`,
+                }"
+            >
+                <div class="drag-handle">{{ person.surname }}</div>
+                <small>{{ person.name }}</small>
+                <small>{{ person.id }}</small>
+            </div>
         </div>
     </div>
 </template>
 
 <style>
-.main-container {
+/* "ВІКНО" - контейнер з реальним розміром екрану */
+.viewport {
     position: relative;
-    width: 100vw;
-    height: 100vh;
-    overflow: hidden;
+    width: 500vw;
+    height: 500vh;
+    overflow: hidden;   /* Обрізає все, що виходить за межі */
     cursor: grab;
 }
-.main-container:active {
+.viewport:active {
     cursor: grabbing;
 }
-.viewport {
+
+/* "СВІТ" - гігантський контейнер, який ми рухаємо */
+.main-container {
     position: absolute;
     top: 0;
     left: 0;
+    width: 100%;
+    height: 100%;
+    overflow: visible;
     transform-origin: 0 0;
     transition: transform 0.02s linear;
 }
+
+/* Блок для людини */
 .draggable-box {
     width: 200px;
     padding-bottom: 10px;
@@ -185,7 +204,7 @@ if (import.meta.hot) {
     border-radius: 8px;
     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
     text-align: center;
-    z-index: 10;
+    z-index: 10; /* Має бути вище за лінії (z-index: 1) */
     display: flex;
     flex-direction: column;
     align-items: center;
@@ -193,6 +212,8 @@ if (import.meta.hot) {
     position: absolute;
     transform-origin: top left;
 }
+
+/* "Ручка" для перетягування блоку */
 .drag-handle {
     width: 100%;
     padding: 10px;
@@ -207,11 +228,18 @@ if (import.meta.hot) {
     margin-top: 8px;
     color: #718096;
 }
+
+/* SVG-полотно для малювання ліній */
 .line-canvas {
     width: 100%;
     height: 100%;
     position: absolute;
+    top: 0;    /* <-- ВАЖЛИВЕ ВИПРАВЛЕННЯ */
+    left: 0;   /* <-- ВАЖЛИВЕ ВИПРАВЛЕННЯ */
+    z-index: 1; /* Лінії знаходяться під блоками */
 }
+
+/* Стилі для ліній та вузлів зв'язку */
 .connector-line {
     stroke: #a0aec0;
     stroke-width: 2px;
