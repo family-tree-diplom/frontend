@@ -16,7 +16,6 @@ export function useFamilyData(trees_id: number) {
                     },
                 },
             });
-            console.log(trees_id);
             return response[0].result;
         },
         { default: () => [] }
