@@ -30,8 +30,6 @@ const { data: tree } = await useAsyncData(
 
 const { peoples, relations } = await useFamilyData(tree.value.id);
 
-console.log(relations.value);
-
 const boxRefs = ref([]); // посилання на div-блоки
 const lineRefs = ref([]); // посилання на svg-лінії
 const circleRefs = ref<Record<string, SVGCircleElement>>({});
@@ -42,7 +40,7 @@ interface Position {
 }
 const positions = reactive<Record<number, Position>>({});
 
-const STORAGE_KEY = 'family_positions';
+const STORAGE_KEY = computed(() => `family_positions_${route.params.slug}`);
 
 const { camera, cameraStyle } = useCamera();
 const { updateAllLines, marriageCenters, makePairKey } = useFamilyLines(
@@ -54,20 +52,49 @@ const { updateAllLines, marriageCenters, makePairKey } = useFamilyLines(
 );
 
 function savePositions() {
-    sessionStorage.setItem(STORAGE_KEY, JSON.stringify(toRaw(positions)));
+    if (!process.client || !tree.value?.id) return;
+    const data = {
+        treeId: tree.value.id,
+        slug: route.params.slug,
+        positions: toRaw(positions),
+        updatedAt: new Date().toISOString(),
+    };
+    localStorage.setItem(STORAGE_KEY.value, JSON.stringify(data));
 }
 
 function loadPositions() {
-    const raw = process.client?sessionStorage.getItem(STORAGE_KEY):null;
+    if (!process.client) return {};
+    const raw = localStorage.getItem(STORAGE_KEY.value);
     if (!raw) return {};
     try {
-        return JSON.parse(raw) as Record<number, Position>;
+        const parsed = JSON.parse(raw);
+        if (parsed.slug !== route.params.slug) return {};
+        return parsed.positions || {};
     } catch {
         return {};
     }
 }
 
-const { makeDraggable } = useDraggable(updateAllLines, camera, positions);
+// --- Ініціалізація позицій після повного завантаження дерева
+async function initPositions() {
+    await nextTick();
+    const saved = loadPositions();
+
+    peoples.value.forEach((p, index) => {
+        if (saved[p.id]) {
+            positions[p.id] = { x: saved[p.id].x, y: saved[p.id].y };
+        } else if (!positions[p.id]) {
+            positions[p.id] = { x: 150 + index * 100, y: 100 + index * 80 };
+        }
+    });
+
+    nextTick(initDragAndLines);
+}
+
+const { makeDraggable } = useDraggable(() => {
+    updateAllLines();
+    savePositions(); // зберігати після кожного руху
+}, camera, positions);
 
 function initDragAndLines() {
     if (!process.client) return;
@@ -104,33 +131,22 @@ const gridStyle = computed(() => {
         backgroundColor: '#fff',
     };
 });
-watch(
-    peoples,
-    (newPeoples) => {
-        if (!newPeoples || newPeoples.length === 0) return;
 
-        const saved = loadPositions();
+// --- Виклик при зміні peoples або slug
+watch([peoples, () => route.params.slug], () => {
+    if (!peoples.value || peoples.value.length === 0) return;
+    initPositions();
+}, { immediate: true });
 
-        newPeoples.forEach((p, index) => {
-            if (!positions[p.id]) {
-                if (saved[p.id]) {
-                    positions[p.id] = { x: saved[p.id].x, y: saved[p.id].y };
-                } else {
-                    positions[p.id] = { x: 150 + index * 100, y: 100 + index * 80 };
-                }
-            }
-        });
-
-        nextTick(initDragAndLines);
-    },
-    { immediate: true }
-);
-
+// --- Гарантоване відновлення після reload
 onMounted(() => {
-    if (process.client) window.addEventListener('beforeunload', savePositions);
+    initPositions(); // <– важливо: додатковий виклик
+    window.addEventListener('beforeunload', savePositions);
 });
+
 onBeforeUnmount(() => {
-    if (process.client) window.removeEventListener('beforeunload', savePositions);
+    savePositions();
+    window.removeEventListener('beforeunload', savePositions);
     cleanupDrag();
 });
 
