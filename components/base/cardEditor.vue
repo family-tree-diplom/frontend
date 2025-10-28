@@ -1,40 +1,33 @@
 <script setup lang="ts">
 const props = defineProps({
-    person: { type: Object, required: true },
+    modelValue: {
+        type: Object,
+        default() {
+            return null;
+        },
+    },
     position: { type: Object, required: true, default: () => ({ x: 0, y: 0 }) },
-    makeDraggable: { type: Function, required: true },
-    boxRefs: { type: Object, required: true },
-});
-
-onMounted(() => {
-    const el = props.boxRefs[props.person.id];
-    if (el) props.makeDraggable(el);
-});
-onBeforeUnmount(() => {
-    const el = props.boxRefs[props.person.id];
-    if (el) {
-        el.onmousedown = el.onmouseup = el.onmousemove = null;
-    }
 });
 </script>
 
 <template>
     <div
         v-if="position"
-        :ref="(el) => (boxRefs[person.id] = el)"
         class="draggable-box"
         :style="{ transform: `translate(${position?.x ?? 0}px, ${position?.y ?? 0}px)` }"
     >
-        <div class="drag-handle">{{ person.surname +" "+ person.name }}</div>
-        <small>{{person?.birth_day + "-" + person?.death}}</small>
-        <small>{{ person.id }}</small>
-<!--        <pre>{{person}}</pre>-->
+        <div class="drag-handle">
+            <atom-input placeholder="Прізвище" :model-value="modelValue.surname"></atom-input>
+            <atom-input placeholder="Ім'я" :model-value="modelValue.name"></atom-input>
+        </div>
+        <small><atom-input placeholder="Ім'я" :model-value="modelValue.name"></atom-input></small>
+
     </div>
 </template>
 
 <style lang="scss">
 .draggable-box {
-    width: 250px;
+    width: 200px;
     background-color: #fff;
     border: 1px solid #ddd;
     border-radius: 8px;

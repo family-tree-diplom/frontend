@@ -29,10 +29,23 @@ const { data: tree } = await useAsyncData(
 );
 
 const { peoples, relations } = await useFamilyData(tree.value.id);
+const peoplesNew = ref([
+]);
 
 const boxRefs = ref([]); // посилання на div-блоки
 const lineRefs = ref([]); // посилання на svg-лінії
 const circleRefs = ref<Record<string, SVGCircleElement>>({});
+
+const add = () => {
+    peoplesNew.value.push({
+        name: '',
+        surname: '',
+        birth_day: '',
+        death: '',
+        gender: 'unknown',
+    });
+    console.log(1234);
+};
 
 interface Position {
     x: number;
@@ -91,10 +104,14 @@ async function initPositions() {
     nextTick(initDragAndLines);
 }
 
-const { makeDraggable } = useDraggable(() => {
-    updateAllLines();
-    savePositions(); // зберігати після кожного руху
-}, camera, positions);
+const { makeDraggable } = useDraggable(
+    () => {
+        updateAllLines();
+        savePositions(); // зберігати після кожного руху
+    },
+    camera,
+    positions
+);
 
 function initDragAndLines() {
     if (!process.client) return;
@@ -133,14 +150,18 @@ const gridStyle = computed(() => {
 });
 
 // --- Виклик при зміні peoples або slug
-watch([peoples, () => route.params.slug], () => {
-    if (!peoples.value || peoples.value.length === 0) return;
-    initPositions();
-}, { immediate: true });
+watch(
+    [peoples, () => route.params.slug],
+    () => {
+        if (!peoples.value || peoples.value.length === 0) return;
+        initPositions();
+    },
+    { immediate: true }
+);
 
 // --- Гарантоване відновлення після reload
 onMounted(() => {
-    initPositions(); // <– важливо: додатковий виклик
+    initPositions();
     window.addEventListener('beforeunload', savePositions);
 });
 
@@ -166,8 +187,9 @@ useHead({
 </script>
 
 <template>
+    <core-tools @add="add"></core-tools>
     <div class="main-container viewport">
-        <div class="canvas-wrapper" :style="[cameraStyle, gridStyle]">
+        <div class="canvas-wrapper" :style="[cameraStyle]">
             <svg v-if="peoples?.length > 1" class="line-canvas" :style="{ width: '50000px', height: '50000px' }">
                 <line
                     v-for="(relation, index) in relations"
@@ -184,7 +206,8 @@ useHead({
                     class="connector-circle"
                 />
             </svg>
-
+            <base-card-editor v-if="peoplesNew.length" v-for="(person, index) in peoplesNew" :key="index" :model-value="person">
+            </base-card-editor>
             <base-card
                 v-for="person in peoples"
                 :key="person.id"
@@ -203,6 +226,7 @@ useHead({
     width: 100vw;
     height: 100vh;
     overflow: hidden;
+    z-index: 1;
 }
 .canvas-wrapper {
     position: absolute;

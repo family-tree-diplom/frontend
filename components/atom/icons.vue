@@ -1,0 +1,29 @@
+<script lang="ts" setup>
+defineProps({
+    name: {
+        type: String,
+        required: true,
+    },
+    store: {
+        type: String,
+        default() {
+            return 'icons';
+        },
+    },
+});
+</script>
+<template>
+    <svg class="icons" :class="'icons_' + name">
+        <use v-bind="{ 'xlink:href': store + '.svg#' + name }"></use>
+    </svg>
+</template>
+
+<style lang="scss">
+.icons {
+    display: inline-block;
+    &_personPlus {
+        width: 50px;
+        height: 50px;
+    }
+}
+</style>
