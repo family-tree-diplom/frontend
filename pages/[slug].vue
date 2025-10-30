@@ -44,7 +44,6 @@ const add = () => {
         death: '',
         gender: 'unknown',
     });
-    console.log(1234);
 };
 
 interface Position {
@@ -229,7 +228,7 @@ useHead({
     z-index: 1;
 }
 .canvas-wrapper {
-    position: absolute;
+    position: fixed;
     top: 0;
     left: 0;
     width: 50000px;
