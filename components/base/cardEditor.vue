@@ -65,7 +65,7 @@ const props = defineProps({
     align-items: center;
     transform-origin: top left;
     z-index: 10;
-    padding: 10px 0;
+    padding-bottom: 10px;
     box-sizing: border-box;
 }
 
