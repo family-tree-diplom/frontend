@@ -213,7 +213,7 @@ useHead({
 
 <template>
     <pre>{{ peoplesNew }}</pre>
-    <core-tools @add="add" @save="save"></core-tools>
+    <core-tools :loading="loading" @add="add" @save="save"></core-tools>
     <div class="main-container viewport">
         <div class="canvas-wrapper" :style="[cameraStyle]">
             <svg v-if="peoples?.length > 1" class="line-canvas" :style="{ width: '50000px', height: '50000px' }">
