@@ -4,6 +4,7 @@ const props = defineProps({
     position: { type: Object, required: true, default: () => ({ x: 0, y: 0 }) },
     makeDraggable: { type: Function, required: true },
     boxRefs: { type: Object, required: true },
+    selected: { type: Boolean, default: () => false },
 });
 
 onMounted(() => {
@@ -22,17 +23,24 @@ onBeforeUnmount(() => {
     <div
         v-if="position"
         :ref="(el) => (boxRefs[person.id] = el)"
-        class="draggable-box"
+        class="draggable-box card"
+        :class="{ card_selected: selected }"
+        :data-id="person.id"
         :style="{ transform: `translate(${position?.x ?? 0}px, ${position?.y ?? 0}px)` }"
     >
-        <div class="drag-handle">{{ person.surname +" "+ person.name }}</div>
-        <small>{{person?.birth_day + "-" + person?.death}}</small>
+        <div class="drag-handle">{{ person.surname + ' ' + person.name }}</div>
+        <small>{{ person?.birth_day + '-' + person?.death }}</small>
         <small>{{ person.id }}</small>
-<!--        <pre>{{person}}</pre>-->
     </div>
 </template>
 
 <style lang="scss">
+.card {
+    &_selected {
+        outline: 2px solid #3182ce;
+        box-shadow: 0 0 8px rgba(49, 130, 206, 0.8);
+    }
+}
 .draggable-box {
     width: 250px;
     background-color: #fff;

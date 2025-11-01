@@ -129,13 +129,23 @@ async function initPositions() {
     nextTick(initDragAndLines);
 }
 
+const selectedIds = reactive(new Set<number>());
+
+function toggleSelect(id: number, multi = false) {
+    if (!multi) selectedIds.clear();
+    if (selectedIds.has(id)) selectedIds.delete(id);
+    else selectedIds.add(id);
+}
+
 const { makeDraggable } = useDraggable(
     () => {
         updateAllLines();
         savePositions(); // зберігати після кожного руху
     },
     camera,
-    positions
+    positions,
+    selectedIds,
+    toggleSelect
 );
 
 function initDragAndLines() {
@@ -215,7 +225,7 @@ useHead({
     <pre>{{ peoplesNew }}</pre>
     <core-tools :loading="loading" @add="add" @save="save"></core-tools>
     <div class="main-container viewport">
-        <div class="canvas-wrapper" :style="[cameraStyle]">
+        <div class="canvas-wrapper" :style="[cameraStyle]" @mousedown.self="selectedIds.clear()">
             <svg v-if="peoples?.length > 1" class="line-canvas" :style="{ width: '50000px', height: '50000px' }">
                 <line
                     v-for="(relation, index) in relations"
@@ -241,6 +251,7 @@ useHead({
             <base-card
                 v-for="person in peoples"
                 :key="person.id"
+                :selected="selectedIds.has(person.id)"
                 :person="person"
                 :position="positions[person.id]"
                 :makeDraggable="makeDraggable"
