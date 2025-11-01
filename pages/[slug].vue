@@ -28,13 +28,14 @@ const { data: tree } = await useAsyncData(
     { default: () => [] }
 );
 
-const { peoples, relations } = await useFamilyData(tree.value.id);
-const peoplesNew = ref([
-]);
+const { peoples, relations, peoplesRefresh } = await useFamilyData(tree.value.id);
+const peoplesNew = ref([]);
 
 const boxRefs = ref([]); // посилання на div-блоки
 const lineRefs = ref([]); // посилання на svg-лінії
 const circleRefs = ref<Record<string, SVGCircleElement>>({});
+
+const loading = ref(false);
 
 const add = () => {
     peoplesNew.value.push({
@@ -44,6 +45,30 @@ const add = () => {
         death: '',
         gender: 'unknown',
     });
+};
+
+const save = async () => {
+    if (loading.value) return;
+    loading.value = true;
+    const response = await $fetch('api/peoples', {
+        baseURL: process.server ? config.public.API_BASE_URL : '',
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: {
+            jsonrpc: '2.0',
+            method: 'save',
+            params: {
+                peoples: peoplesNew.value,
+                treeId: tree.value.id,
+            },
+        },
+    });
+    if (response[0].error) {
+        console.error(response[0].error);
+    }else{
+        peoplesRefresh;
+    }
+    loading.value = false;
 };
 
 interface Position {
@@ -186,7 +211,8 @@ useHead({
 </script>
 
 <template>
-    <core-tools @add="add"></core-tools>
+    <pre>{{ peoplesNew }}</pre>
+    <core-tools @add="add" @save="save"></core-tools>
     <div class="main-container viewport">
         <div class="canvas-wrapper" :style="[cameraStyle]">
             <svg v-if="peoples?.length > 1" class="line-canvas" :style="{ width: '50000px', height: '50000px' }">
@@ -205,8 +231,12 @@ useHead({
                     class="connector-circle"
                 />
             </svg>
-            <base-card-editor v-if="peoplesNew.length" v-for="(person, index) in peoplesNew" :key="index" :model-value="person">
-            </base-card-editor>
+            <base-card-editor
+                v-if="peoplesNew.length"
+                v-for="(person, index) in peoplesNew"
+                :key="index"
+                :model-value="person"
+            ></base-card-editor>
             <base-card
                 v-for="person in peoples"
                 :key="person.id"
@@ -235,6 +265,7 @@ useHead({
     height: 50000px;
     transform-origin: 0 0;
     z-index: 0;
+    cursor: grab;
 }
 .line-canvas {
     position: absolute;

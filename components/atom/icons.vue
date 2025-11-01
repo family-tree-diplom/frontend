@@ -25,5 +25,9 @@ defineProps({
         width: 50px;
         height: 50px;
     }
+    &_save {
+        width: 50px;
+        height: 50px;
+    }
 }
 </style>

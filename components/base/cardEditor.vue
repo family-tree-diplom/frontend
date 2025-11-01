@@ -17,14 +17,14 @@ const props = defineProps({
         :style="{ transform: `translate(${position?.x ?? 0}px, ${position?.y ?? 0}px)` }"
     >
         <div class="drag-handle">
-            <atom-input placeholder="Прізвище" :model-value="modelValue.surname" class="styled-input" />
-            <atom-input placeholder="Ім'я" :model-value="modelValue.name" class="styled-input" />
+            <atom-input placeholder="Прізвище" v-model="modelValue.surname" class="styled-input" />
+            <atom-input placeholder="Ім'я" v-model="modelValue.name" class="styled-input" />
         </div>
 
         <small>
             <atom-input
                 placeholder="Дата народження"
-                :model-value="modelValue.birth_day"
+                v-model="modelValue.birth_day"
                 class="styled-input small-input"
             />
         </small>
@@ -32,7 +32,7 @@ const props = defineProps({
         <small>
             <atom-input
                 placeholder="Дата смерті"
-                :model-value="modelValue.death"
+                v-model="modelValue.death"
                 class="styled-input small-input"
             />
         </small>

@@ -1,8 +1,8 @@
 export function useFamilyData(trees_id: number) {
     const config = useRuntimeConfig();
 
-    const { data: peoples } = useAsyncData(
-        'peoples-'+trees_id,
+    const { data: peoples, refresh: peoplesRefresh } = useAsyncData(
+        'peoples-' + trees_id,
         async () => {
             const response = await $fetch('api/peoples', {
                 baseURL: process.server ? config.public.API_BASE_URL : '',
@@ -30,5 +30,7 @@ export function useFamilyData(trees_id: number) {
         return result;
     });
 
-    return { peoples, relations };
+    return { peoples, relations, peoplesRefresh };
 }
+
+
