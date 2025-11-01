@@ -65,8 +65,9 @@ const save = async () => {
     });
     if (response[0].error) {
         console.error(response[0].error);
-    }else{
-        peoplesRefresh;
+    } else {
+        await peoplesRefresh();
+        peoplesNew.value = [];
     }
     loading.value = false;
 };
