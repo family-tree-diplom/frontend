@@ -29,5 +29,9 @@ defineProps({
         width: 30px;
         height: 30px;
     }
+    &_personDef{
+        width: 30px;
+        height: 30px;
+    }
 }
 </style>

@@ -42,8 +42,8 @@ const props = defineProps({
                 v-model="modelValue.gender"
                 :options="[
             { value: 'unknown', label: 'Не визначено' },
-            { value: 'male', label: 'Чоловік' },
-            { value: 'female', label: 'Жінка' }
+            { value: 'man', label: 'Чоловік' },
+            { value: 'woman', label: 'Жінка' }
         ]"
                 class="styled-select small-input"
             />

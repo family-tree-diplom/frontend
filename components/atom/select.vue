@@ -9,8 +9,8 @@ const props = defineProps({
         type: Array as () => { value: string; label: string }[],
         default: () => [
             { value: 'unknown', label: 'Не визначено' },
-            { value: 'male', label: 'Чоловік' },
-            { value: 'female', label: 'Жінка' },
+            { value: 'man', label: 'Чоловік' },
+            { value: 'woman', label: 'Жінка' },
         ],
     },
     label: {

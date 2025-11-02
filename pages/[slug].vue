@@ -48,6 +48,20 @@ const add = () => {
 };
 
 const save = async () => {
+    await submit('save', {
+        peoples: peoplesNew.value,
+        treeId: tree.value.id,
+    })
+};
+
+const deletePerson = async () => {
+   await submit('deletePerson', {
+       selectedIds: Array.from(selectedIds),
+       treeId: tree.value.id,
+   })
+};
+
+const submit = async (method:String, params:Object)=>{
     if (loading.value) return;
     loading.value = true;
     const response = await $fetch('api/peoples', {
@@ -56,10 +70,9 @@ const save = async () => {
         headers: { 'Content-Type': 'application/json' },
         body: {
             jsonrpc: '2.0',
-            method: 'save',
+            method: method,
             params: {
-                peoples: peoplesNew.value,
-                treeId: tree.value.id,
+                ...params,
             },
         },
     });
@@ -70,7 +83,7 @@ const save = async () => {
         peoplesNew.value = [];
     }
     loading.value = false;
-};
+}
 
 interface Position {
     x: number;
@@ -222,8 +235,8 @@ useHead({
 </script>
 
 <template>
-    <pre>{{ peoplesNew }}</pre>
-    <core-tools :loading="loading" @add="add" @save="save"></core-tools>
+    <pre>{{ selectedIds }}</pre>
+    <core-tools :loading="loading" @add="add" @save="save" @deletePerson="deletePerson"></core-tools>
     <div class="main-container viewport">
         <div class="canvas-wrapper" :style="[cameraStyle]" @mousedown.self="selectedIds.clear()">
             <svg v-if="peoples?.length > 1" class="line-canvas" :style="{ width: '50000px', height: '50000px' }">
