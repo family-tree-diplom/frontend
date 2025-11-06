@@ -28,8 +28,19 @@ onBeforeUnmount(() => {
         :data-id="person.id"
         :style="{ transform: `translate(${position?.x ?? 0}px, ${position?.y ?? 0}px)` }"
     >
-        <div class="drag-handle">{{ person.surname + ' ' + person.name }}</div>
-        <small>{{ person?.birth_day + '-' + person?.death }}</small>
+        <div
+            class="drag-handle"
+            :class="{
+                male: person.gender === 'man',
+                female: person.gender === 'woman',
+                unknown: !person.gender || person.gender === 'unknown',
+            }"
+        >
+            {{ person.surname + ' ' + person.name }}
+        </div>
+        <small>
+            {{ person?.birth_day || '' }}{{ person?.death ? ' - ' + person.death : '' }}
+        </small>
         <small>{{ person.id }}</small>
     </div>
 </template>
@@ -65,6 +76,19 @@ onBeforeUnmount(() => {
     border-top-left-radius: 8px;
     border-top-right-radius: 8px;
 }
+
+.drag-handle.male {
+    background-color: #2a5bba;
+}
+
+.drag-handle.female {
+    background-color: #d86ba4;
+}
+
+.drag-handle.unknown {
+    background-color: #2d3748;
+}
+
 .draggable-box small {
     margin-top: 8px;
     color: #718096;
