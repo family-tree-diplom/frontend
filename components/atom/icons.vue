@@ -33,5 +33,9 @@ defineProps({
         width: 30px;
         height: 30px;
     }
+    &_relations{
+        width: 30px;
+        height: 30px;
+    }
 }
 </style>

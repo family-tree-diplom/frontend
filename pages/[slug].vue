@@ -51,17 +51,28 @@ const save = async () => {
     await submit('save', {
         peoples: peoplesNew.value,
         treeId: tree.value.id,
-    })
+    });
 };
 
 const deletePerson = async () => {
-   await submit('deletePerson', {
-       selectedIds: Array.from(selectedIds),
-       treeId: tree.value.id,
-   })
+    await submit('deletePerson', {
+        selectedIds: Array.from(selectedIds),
+        treeId: tree.value.id,
+    });
 };
 
-const submit = async (method:String, params:Object)=>{
+const relationsPopup = ref(false);
+
+const addRelations = () => {
+    relationsPopup.value = true;
+};
+
+const getPeoples = () => {
+    const ids =  Array.from(selectedIds);
+    return ids.map(id => peoples.value.find(item => item.id === id)).filter(Boolean);
+}
+
+const submit = async (method: String, params: Object) => {
     if (loading.value) return;
     loading.value = true;
     const response = await $fetch('api/peoples', {
@@ -83,7 +94,7 @@ const submit = async (method:String, params:Object)=>{
         peoplesNew.value = [];
     }
     loading.value = false;
-}
+};
 
 interface Position {
     x: number;
@@ -235,8 +246,62 @@ useHead({
 </script>
 
 <template>
-    <pre>{{ selectedIds }}</pre>
-    <core-tools :loading="loading" @add="add" @save="save" @deletePerson="deletePerson"></core-tools>
+<!--    <pre>{{ selectedIds }}</pre>-->
+    <atom-popup v-model="relationsPopup">
+        <div class="relation-box">
+            <!-- Якщо вибрано 3 людини -->
+            <div v-if="getPeoples().length === 3" class="relation-block relation-parent">
+                <h4>Зв’язок між батьками і дитиною</h4>
+                <div class="relation-content">
+                    <p>
+                        Від <span class="person">{{ getPeoples()[0].name }} {{ getPeoples()[0].surname }}</span>
+                        <span class="date">({{ getPeoples()[0].birth_day }})</span>
+                    </p>
+                    <p>
+                        і <span class="person">{{ getPeoples()[1].name }} {{ getPeoples()[1].surname }}</span>
+                        <span class="date">({{ getPeoples()[1].birth_day }})</span>
+                    </p>
+                    <p>
+                        прокласти батьківський зв’язок до
+                        <span class="child">{{ getPeoples()[2].name }} {{ getPeoples()[2].surname }}</span>
+                        <span class="date">({{ getPeoples()[2].birth_day }})</span>
+                    </p>
+                </div>
+            </div>
+
+            <!-- Якщо вибрано 2 людини -->
+            <div v-else-if="getPeoples().length === 2" class="relation-block relation-marriage">
+                <h4>Шлюбний зв’язок</h4>
+                <div class="relation-content">
+                    <p>
+                        Від <span class="person">{{ getPeoples()[0].name }} {{ getPeoples()[0].surname }}</span>
+                        <span class="date">({{ getPeoples()[0].birth_day }})</span>
+                    </p>
+                    <p>
+                        до <span class="person">{{ getPeoples()[1].name }} {{ getPeoples()[1].surname }}</span>
+                        <span class="date">({{ getPeoples()[1].birth_day }})</span>
+                    </p>
+                </div>
+            </div>
+
+            <!-- Якщо забагато -->
+            <div v-else-if="getPeoples().length > 3" class="relation-message warning">
+                <p>Забагато обраних людей</p>
+            </div>
+
+            <!-- Якщо замало -->
+            <div v-else class="relation-message hint">
+                <p>Виберіть людей, щоб створити зв’язок</p>
+            </div>
+        </div>
+    </atom-popup>
+    <core-tools
+        :loading="loading"
+        @add="add"
+        @save="save"
+        @deletePerson="deletePerson"
+        @addRelations="addRelations"
+    ></core-tools>
     <div class="main-container viewport">
         <div class="canvas-wrapper" :style="[cameraStyle]" @mousedown.self="selectedIds.clear()">
             <svg v-if="peoples?.length > 1" class="line-canvas" :style="{ width: '50000px', height: '50000px' }">
@@ -309,5 +374,76 @@ useHead({
     stroke: #a0aec0;
     fill: #a0aec0;
     stroke-width: 2px;
+}
+
+.relation-box {
+    background: #f8f9fa;
+    border: 1px solid #ddd;
+    border-radius: 12px;
+    padding: 16px 20px;
+    font-family: "Segoe UI", sans-serif;
+    color: #333;
+    max-width: 480px;
+    line-height: 1.5;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.05);
+}
+
+.relation-block {
+    border-left: 4px solid #a0a0a0;
+    padding-left: 12px;
+}
+
+.relation-parent {
+    border-left-color: #4a90e2;
+}
+
+.relation-marriage {
+    border-left-color: #d36ba4;
+}
+
+.relation-content p {
+    margin: 6px 0;
+}
+
+.relation-block h4 {
+    margin-bottom: 8px;
+    font-size: 1.05em;
+    font-weight: 600;
+    color: #222;
+}
+
+.person {
+    font-weight: 500;
+    color: #1a5fb4;
+}
+
+.child {
+    font-weight: 600;
+    color: #2c8d46;
+}
+
+.date {
+    color: #777;
+    font-size: 0.9em;
+    margin-left: 4px;
+}
+
+.relation-message {
+    text-align: center;
+    padding: 10px;
+    font-size: 0.95em;
+    border-radius: 8px;
+}
+
+.relation-message.warning {
+    background: #ffe5e5;
+    color: #b80000;
+    border: 1px solid #f3c2c2;
+}
+
+.relation-message.hint {
+    background: #f2f5f8;
+    color: #555;
+    border: 1px dashed #ccc;
 }
 </style>
