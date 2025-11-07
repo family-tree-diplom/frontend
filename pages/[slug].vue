@@ -8,8 +8,6 @@ import { process } from 'std-env';
 const config = useRuntimeConfig();
 const route = useRoute();
 
-const relationType = ref(''); // 'marriage' або 'parent'
-
 const { data: tree } = await useAsyncData(
     'Trees',
     async () => {
@@ -70,14 +68,14 @@ const addRelations = () => {
 };
 
 const getPeoples = () => {
-    const ids =  Array.from(selectedIds);
-    return ids.map(id => peoples.value.find(item => item.id === id)).filter(Boolean);
-}
+    const ids = Array.from(selectedIds);
+    return ids.map((id) => peoples.value.find((item) => item.id === id)).filter(Boolean);
+};
 
-const submit = async (method: String, params: Object) => {
+const submit = async (method: String, params: Object, controller = 'peoples') => {
     if (loading.value) return;
     loading.value = true;
-    const response = await $fetch('api/peoples', {
+    const response = await $fetch('api/' + controller, {
         baseURL: process.server ? config.public.API_BASE_URL : '',
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -96,6 +94,21 @@ const submit = async (method: String, params: Object) => {
         peoplesNew.value = [];
     }
     loading.value = false;
+};
+
+const relationType = ref(''); // 'marriage' або 'parent'
+
+const addRelation = async () => {
+    relationsPopup.value = false;
+    await submit(
+        'addRelation',
+        {
+            type: Array.from(selectedIds).length === 3 ? 'parent' : relationType.value,
+            peoples: Array.from(selectedIds),
+            treeId: tree.value.id,
+        },
+        'relations'
+    );
 };
 
 interface Position {
@@ -248,6 +261,7 @@ useHead({
 </script>
 
 <template>
+    <!--    <pre>{{relations}}</pre>-->
     <atom-popup v-model="relationsPopup">
         <div class="relation-box">
             <!-- Якщо вибрано 3 людей -->
@@ -255,11 +269,13 @@ useHead({
                 <h4>Зв’язок між батьками і дитиною</h4>
                 <div class="relation-content">
                     <p>
-                        Від <span class="person">{{ getPeoples()[0].surname }} {{ getPeoples()[0].name }}</span>
+                        Від
+                        <span class="person">{{ getPeoples()[0].surname }} {{ getPeoples()[0].name }}</span>
                         <span class="date">({{ getPeoples()[0].birth_day }})</span>
                     </p>
                     <p>
-                        і <span class="person">{{ getPeoples()[1].surname }} {{ getPeoples()[1].name }}</span>
+                        і
+                        <span class="person">{{ getPeoples()[1].surname }} {{ getPeoples()[1].name }}</span>
                         <span class="date">({{ getPeoples()[1].birth_day }})</span>
                     </p>
                     <p>
@@ -270,8 +286,8 @@ useHead({
                 </div>
 
                 <div class="btn-group">
-                    <button class="btn accept" @click="acceptRelation('parent')">Прийняти</button>
-                    <button class="btn reject" @click="rejectRelation">Відхилити</button>
+                    <button class="btn accept" @click="addRelation()">Прийняти</button>
+                    <button class="btn reject" @click="relationsPopup = false">Відхилити</button>
                 </div>
             </div>
 
@@ -281,30 +297,24 @@ useHead({
 
                 <div class="relation-selector">
                     <label>
-                        <input
-                            type="radio"
-                            value="marriage"
-                            v-model="relationType"
-                        />
+                        <input type="radio" value="marriage" v-model="relationType" />
                         Шлюбний зв’язок
                     </label>
                     <label>
-                        <input
-                            type="radio"
-                            value="parent"
-                            v-model="relationType"
-                        />
+                        <input type="radio" value="parent" v-model="relationType" />
                         Батьківський зв’язок
                     </label>
                 </div>
 
                 <div v-if="relationType === 'marriage'" class="relation-content relation-marriage">
                     <p>
-                        Від <span class="person">{{ getPeoples()[0].surname }} {{ getPeoples()[0].name }}</span>
+                        Від
+                        <span class="person">{{ getPeoples()[0].surname }} {{ getPeoples()[0].name }}</span>
                         <span class="date">({{ getPeoples()[0].birth_day }})</span>
                     </p>
                     <p>
-                        до <span class="person">{{ getPeoples()[1].surname }} {{ getPeoples()[1].name }}</span>
+                        до
+                        <span class="person">{{ getPeoples()[1].surname }} {{ getPeoples()[1].name }}</span>
                         <span class="date">({{ getPeoples()[1].birth_day }})</span>
                     </p>
                     <p>Створити шлюбний зв’язок між цими особами.</p>
@@ -312,25 +322,21 @@ useHead({
 
                 <div v-else-if="relationType === 'parent'" class="relation-content relation-parent">
                     <p>
-                        Від <span class="person">{{ getPeoples()[0].surname }} {{ getPeoples()[0].name }}</span>
+                        Від
+                        <span class="person">{{ getPeoples()[0].surname }} {{ getPeoples()[0].name }}</span>
                         <span class="date">({{ getPeoples()[0].birth_day }})</span>
                     </p>
                     <p>
-                        до <span class="child">{{ getPeoples()[1].surname }} {{ getPeoples()[1].name }}</span>
+                        до
+                        <span class="child">{{ getPeoples()[1].surname }} {{ getPeoples()[1].name }}</span>
                         <span class="date">({{ getPeoples()[1].birth_day }})</span>
                     </p>
                     <p>Створити батьківський зв’язок між цими особами.</p>
                 </div>
 
                 <div class="btn-group">
-                    <button
-                        class="btn accept"
-                        :disabled="!relationType"
-                        @click="acceptRelation(relationType)"
-                    >
-                        Прийняти
-                    </button>
-                    <button class="btn reject" @click="rejectRelation">Відхилити</button>
+                    <button class="btn accept" :disabled="!relationType" @click="addRelation()">Прийняти</button>
+                    <button class="btn reject" @click="relationsPopup = false">Відхилити</button>
                 </div>
             </div>
 
@@ -338,7 +344,7 @@ useHead({
             <div v-else-if="getPeoples().length > 3" class="relation-message warning">
                 <p>Забагато обраних людей</p>
                 <div class="btn-group">
-                    <button class="btn reject" @click="rejectRelation">Відхилити</button>
+                    <button class="btn reject" @click="relationsPopup = false">Відхилити</button>
                 </div>
             </div>
 
@@ -346,7 +352,7 @@ useHead({
             <div v-else class="relation-message hint">
                 <p>Виберіть людей, щоб створити зв’язок</p>
                 <div class="btn-group">
-                    <button class="btn reject" @click="rejectRelation">Відхилити</button>
+                    <button class="btn reject" @click="relationsPopup = false">Відхилити</button>
                 </div>
             </div>
         </div>
@@ -437,11 +443,11 @@ useHead({
     border: 1px solid #ddd;
     border-radius: 12px;
     padding: 16px 20px;
-    font-family: "Segoe UI", sans-serif;
+    font-family: 'Segoe UI', sans-serif;
     color: #333;
     max-width: 520px;
     line-height: 1.5;
-    box-shadow: 0 2px 6px rgba(0,0,0,0.05);
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.05);
 }
 
 .relation-block {
@@ -474,7 +480,7 @@ useHead({
     user-select: none;
 }
 
-.relation-selector input[type="radio"] {
+.relation-selector input[type='radio'] {
     margin-right: 6px;
 }
 
