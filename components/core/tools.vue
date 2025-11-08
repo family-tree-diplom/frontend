@@ -5,7 +5,7 @@ defineProps({
         default: () => false,
     },
 });
-const emit = defineEmits(['add', 'remove', 'save', "deletePerson", "addRelations"]);
+const emit = defineEmits(['add', 'remove', 'save', "deletePerson", "addRelations", "removeRelations"]);
 </script>
 
 <template>
@@ -22,6 +22,9 @@ const emit = defineEmits(['add', 'remove', 'save', "deletePerson", "addRelations
         </button>
         <button class="tools-button" @click="emit('addRelations')" :disabled="loading">
             <atom-icons name="relations"></atom-icons>
+        </button>
+        <button class="tools-button" @click="emit('removeRelations')" :disabled="loading">
+            <atom-icons name="removeRelations"></atom-icons>
         </button>
     </div>
 </template>

@@ -62,6 +62,7 @@ const deletePerson = async () => {
 };
 
 const relationsPopup = ref(false);
+const removeRelationsPopup = ref(false);
 
 const addRelations = () => {
     relationsPopup.value = true;
@@ -104,6 +105,18 @@ const addRelation = async () => {
         'addRelation',
         {
             type: Array.from(selectedIds).length === 3 ? 'parent' : relationType.value,
+            peoples: Array.from(selectedIds),
+            treeId: tree.value.id,
+        },
+        'relations'
+    );
+};
+
+const removeRelations = async () => {
+    removeRelationsPopup.value = false;
+    await submit(
+        'removeRelations',
+        {
             peoples: Array.from(selectedIds),
             treeId: tree.value.id,
         },
@@ -357,13 +370,21 @@ useHead({
             </div>
         </div>
     </atom-popup>
+
     <core-tools
         :loading="loading"
         @add="add"
         @save="save"
         @deletePerson="deletePerson"
         @addRelations="addRelations"
+        @removeRelations="removeRelations"
     ></core-tools>
+
+    <atom-popup v-model="removeRelationsPopup">
+        <button class="btn accept" :disabled="!relationType" @click="removeRelations()">Прийняти</button>
+        <button class="btn reject" @click="relationsPopup = false">Відхилити</button>
+    </atom-popup>
+
     <div class="main-container viewport">
         <div class="canvas-wrapper" :style="[cameraStyle]" @mousedown.self="selectedIds.clear()">
             <svg v-if="peoples?.length > 1" class="line-canvas" :style="{ width: '50000px', height: '50000px' }">
