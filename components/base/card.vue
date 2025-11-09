@@ -51,6 +51,9 @@ onBeforeUnmount(() => {
         outline: 2px solid #3182ce;
         box-shadow: 0 0 8px rgba(49, 130, 206, 0.8);
     }
+    &_hidden{
+        display: none !important;
+    }
 }
 .draggable-box {
     width: 250px;

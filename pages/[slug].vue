@@ -182,6 +182,7 @@ async function initPositions() {
 }
 
 const selectedIds = reactive(new Set<number>());
+const currentId = Array.from(selectedIds);
 
 function toggleSelect(id: number, multi = false) {
     if (!multi) selectedIds.clear();
@@ -223,6 +224,16 @@ function cleanupDrag() {
         el.onmousemove = null;
     });
 }
+
+const currentPerson = computed(() => {
+    return peoples.value.find((p) => p.id === Array.from(selectedIds)[0]) || null;
+});
+
+const editor = ref(false);
+
+const editPerson = () => {
+    editor.value = true;
+};
 
 const gridStyle = computed(() => {
     const size = 20 * camera.scale;
@@ -274,7 +285,6 @@ useHead({
 </script>
 
 <template>
-    <!--    <pre>{{relations}}</pre>-->
     <atom-popup v-model="relationsPopup">
         <div class="relation-box">
             <!-- Якщо вибрано 3 людей -->
@@ -378,6 +388,7 @@ useHead({
         @deletePerson="deletePerson"
         @addRelations="addRelations"
         @removeRelations="removeRelations"
+        @editPerson="editPerson"
     ></core-tools>
 
     <atom-popup v-model="removeRelationsPopup">
@@ -403,12 +414,17 @@ useHead({
                     class="connector-circle"
                 />
             </svg>
-            <base-card-add
+            <base-card-form
                 v-if="peoplesNew.length"
                 v-for="(person, index) in peoplesNew"
                 :key="index"
                 :model-value="person"
-            ></base-card-add>
+            ></base-card-form>
+            <base-card-form
+                v-if="editor === true && Array.from(selectedIds).length > 0"
+                :model-value="currentPerson"
+                :position="positions[Array.from(selectedIds)[0]]"
+            ></base-card-form>
             <base-card
                 v-for="person in peoples"
                 :key="person.id"
@@ -417,6 +433,7 @@ useHead({
                 :position="positions[person.id]"
                 :makeDraggable="makeDraggable"
                 :boxRefs="boxRefs"
+                :class="{ card_hidden: currentPerson?.id === person.id && editor }"
             />
         </div>
     </div>

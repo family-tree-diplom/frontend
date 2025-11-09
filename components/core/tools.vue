@@ -5,25 +5,28 @@ defineProps({
         default: () => false,
     },
 });
-const emit = defineEmits(['add', 'remove', 'save', "deletePerson", "addRelations", "removeRelations"]);
+const emit = defineEmits(['add', 'remove', 'save', "deletePerson", "addRelations", "removeRelations", "editPerson"]);
 </script>
 
 <template>
     <div class="tools" :class="{ tools_loading: loading }">
         <div v-if="loading" class="tools-loader"></div>
-        <button class="tools-button" @click="emit('add')" :disabled="loading">
+        <button class="tools-button" title="Додавання людини" @click="emit('add')" :disabled="loading">
             <atom-icons name="personPlus"></atom-icons>
         </button>
-        <button class="tools-button" @click="emit('save')" :disabled="loading">
-            <atom-icons name="save"></atom-icons>
-        </button>
-        <button class="tools-button" @click="emit('deletePerson')" :disabled="loading">
+        <button class="tools-button" title="Видалення людини" @click="emit('deletePerson')" :disabled="loading">
             <atom-icons name="personDef"></atom-icons>
         </button>
-        <button class="tools-button" @click="emit('addRelations')" :disabled="loading">
+        <button class="tools-button" title="Редагування людини" @click="emit('editPerson')" :disabled="loading">
+            <atom-icons name="editPerson"></atom-icons>
+        </button>
+        <button class="tools-button" title="Збереження доданих людей" @click="emit('save')" :disabled="loading">
+            <atom-icons name="save"></atom-icons>
+        </button>
+        <button class="tools-button" title="Додавання зв'язків" @click="emit('addRelations')" :disabled="loading">
             <atom-icons name="relations"></atom-icons>
         </button>
-        <button class="tools-button" @click="emit('removeRelations')" :disabled="loading">
+        <button class="tools-button" title="Видалення зв'язків" @click="emit('removeRelations')" :disabled="loading">
             <atom-icons name="removeRelations"></atom-icons>
         </button>
     </div>
