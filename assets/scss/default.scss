@@ -1,0 +1,36 @@
+.btn {
+    padding: 6px 14px;
+    border-radius: 6px;
+    border: none;
+    cursor: pointer;
+    font-size: 0.9em;
+    transition: background 0.2s ease;
+    &-group {
+        display: flex;
+        justify-content: flex-end;
+        gap: 10px;
+        margin-top: 14px;
+    }
+    &.accept {
+        background: #2b8a3e;
+        color: #fff;
+        &:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+        }
+        &:hover:not(:disabled) {
+            background: #237734;
+        }
+    }
+    &.reject {
+        background: #d9534f;
+        color: #fff;
+        &:hover {
+            background: #c9302c;
+        }
+    }
+    &-group {
+        display: flex;
+        justify-content: center;
+    }
+}

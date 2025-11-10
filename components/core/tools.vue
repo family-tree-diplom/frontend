@@ -5,7 +5,7 @@ defineProps({
         default: () => false,
     },
 });
-const emit = defineEmits(['add', 'remove', 'save', "deletePerson", "addRelations", "removeRelations", "editPerson"]);
+const emit = defineEmits(['add', 'remove', 'save', 'deletePerson', 'addRelations', 'removeRelations', 'editPerson']);
 </script>
 
 <template>
@@ -36,12 +36,13 @@ const emit = defineEmits(['add', 'remove', 'save', "deletePerson", "addRelations
 .tools {
     position: fixed;
     display: flex;
+    background-color: #fff;
     right: 0;
     padding: 5px 15px;
     border-left: 1px solid grey;
     border-top: 1px solid grey;
     border-bottom: 1px solid grey;
-    border-radius: 10px 0 0 10px;
+    border-radius: 0 0 0 10px;
     z-index: 2;
     &_loading {
         opacity: 0.5;

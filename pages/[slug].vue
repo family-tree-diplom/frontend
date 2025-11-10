@@ -62,7 +62,6 @@ const deletePerson = async () => {
 };
 
 const relationsPopup = ref(false);
-const removeRelationsPopup = ref(false);
 
 const addRelations = () => {
     relationsPopup.value = true;
@@ -112,6 +111,7 @@ const addRelation = async () => {
     );
 };
 
+const removeRelationsPopup = ref(false);
 const removeRelations = async () => {
     removeRelationsPopup.value = false;
     await submit(
@@ -182,7 +182,6 @@ async function initPositions() {
 }
 
 const selectedIds = reactive(new Set<number>());
-const currentId = Array.from(selectedIds);
 
 function toggleSelect(id: number, multi = false) {
     if (!multi) selectedIds.clear();
@@ -285,101 +284,18 @@ useHead({
 </script>
 
 <template>
-    <atom-popup v-model="relationsPopup">
-        <div class="relation-box">
-            <!-- Якщо вибрано 3 людей -->
-            <div v-if="getPeoples().length === 3" class="relation-block relation-parent">
-                <h4>Зв’язок між батьками і дитиною</h4>
-                <div class="relation-content">
-                    <p>
-                        Від
-                        <span class="person">{{ getPeoples()[0].surname }} {{ getPeoples()[0].name }}</span>
-                        <span class="date">({{ getPeoples()[0].birth_day }})</span>
-                    </p>
-                    <p>
-                        і
-                        <span class="person">{{ getPeoples()[1].surname }} {{ getPeoples()[1].name }}</span>
-                        <span class="date">({{ getPeoples()[1].birth_day }})</span>
-                    </p>
-                    <p>
-                        прокласти батьківський зв’язок до
-                        <span class="child">{{ getPeoples()[2].surname }} {{ getPeoples()[2].name }}</span>
-                        <span class="date">({{ getPeoples()[2].birth_day }})</span>
-                    </p>
-                </div>
+    <core-add-relations-popup
+        v-model="relationsPopup"
+        :peoples="getPeoples()"
+        v-model:relationType="relationType"
+        @accept="addRelation"
+    ></core-add-relations-popup>
 
-                <div class="btn-group">
-                    <button class="btn accept" @click="addRelation()">Прийняти</button>
-                    <button class="btn reject" @click="relationsPopup = false">Відхилити</button>
-                </div>
-            </div>
-
-            <!-- Якщо вибрано 2 людини -->
-            <div v-else-if="getPeoples().length === 2" class="relation-block relation-two">
-                <h4>Виберіть тип зв’язку</h4>
-
-                <div class="relation-selector">
-                    <label>
-                        <input type="radio" value="marriage" v-model="relationType" />
-                        Шлюбний зв’язок
-                    </label>
-                    <label>
-                        <input type="radio" value="parent" v-model="relationType" />
-                        Батьківський зв’язок
-                    </label>
-                </div>
-
-                <div v-if="relationType === 'marriage'" class="relation-content relation-marriage">
-                    <p>
-                        Від
-                        <span class="person">{{ getPeoples()[0].surname }} {{ getPeoples()[0].name }}</span>
-                        <span class="date">({{ getPeoples()[0].birth_day }})</span>
-                    </p>
-                    <p>
-                        до
-                        <span class="person">{{ getPeoples()[1].surname }} {{ getPeoples()[1].name }}</span>
-                        <span class="date">({{ getPeoples()[1].birth_day }})</span>
-                    </p>
-                    <p>Створити шлюбний зв’язок між цими особами.</p>
-                </div>
-
-                <div v-else-if="relationType === 'parent'" class="relation-content relation-parent">
-                    <p>
-                        Від
-                        <span class="person">{{ getPeoples()[0].surname }} {{ getPeoples()[0].name }}</span>
-                        <span class="date">({{ getPeoples()[0].birth_day }})</span>
-                    </p>
-                    <p>
-                        до
-                        <span class="child">{{ getPeoples()[1].surname }} {{ getPeoples()[1].name }}</span>
-                        <span class="date">({{ getPeoples()[1].birth_day }})</span>
-                    </p>
-                    <p>Створити батьківський зв’язок між цими особами.</p>
-                </div>
-
-                <div class="btn-group">
-                    <button class="btn accept" :disabled="!relationType" @click="addRelation()">Прийняти</button>
-                    <button class="btn reject" @click="relationsPopup = false">Відхилити</button>
-                </div>
-            </div>
-
-            <!-- Якщо забагато -->
-            <div v-else-if="getPeoples().length > 3" class="relation-message warning">
-                <p>Забагато обраних людей</p>
-                <div class="btn-group">
-                    <button class="btn reject" @click="relationsPopup = false">Відхилити</button>
-                </div>
-            </div>
-
-            <!-- Якщо замало -->
-            <div v-else class="relation-message hint">
-                <p>Виберіть людей, щоб створити зв’язок</p>
-                <div class="btn-group">
-                    <button class="btn reject" @click="relationsPopup = false">Відхилити</button>
-                </div>
-            </div>
-        </div>
-    </atom-popup>
+    <core-remove-relations-pupup
+        v-model="removeRelationsPopup"
+        :disabled="!Array.from(selectedIds).length"
+        @accept="removeRelations"
+    ></core-remove-relations-pupup>
 
     <core-tools
         :loading="loading"
@@ -387,14 +303,9 @@ useHead({
         @save="save"
         @deletePerson="deletePerson"
         @addRelations="addRelations"
-        @removeRelations="removeRelations"
+        @removeRelations="removeRelationsPopup = true"
         @editPerson="editPerson"
     ></core-tools>
-
-    <atom-popup v-model="removeRelationsPopup">
-        <button class="btn accept" :disabled="!relationType" @click="removeRelations()">Прийняти</button>
-        <button class="btn reject" @click="relationsPopup = false">Відхилити</button>
-    </atom-popup>
 
     <div class="main-container viewport">
         <div class="canvas-wrapper" :style="[cameraStyle]" @mousedown.self="selectedIds.clear()">
@@ -424,6 +335,7 @@ useHead({
                 v-if="editor === true && Array.from(selectedIds).length > 0"
                 :model-value="currentPerson"
                 :position="positions[Array.from(selectedIds)[0]]"
+                @save="editor = false"
             ></base-card-form>
             <base-card
                 v-for="person in peoples"
@@ -474,130 +386,5 @@ useHead({
     stroke: #a0aec0;
     fill: #a0aec0;
     stroke-width: 2px;
-}
-
-.relation-box {
-    background: #f8f9fa;
-    border: 1px solid #ddd;
-    border-radius: 12px;
-    padding: 16px 20px;
-    font-family: 'Segoe UI', sans-serif;
-    color: #333;
-    max-width: 520px;
-    line-height: 1.5;
-    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.05);
-}
-
-.relation-block {
-    border-left: 4px solid #a0a0a0;
-    padding-left: 12px;
-    margin-bottom: 8px;
-}
-
-.relation-parent {
-    border-left-color: #4a90e2;
-}
-
-.relation-marriage {
-    border-left-color: #d36ba4;
-}
-
-.relation-two h4 {
-    margin-bottom: 10px;
-}
-
-.relation-selector {
-    display: flex;
-    gap: 20px;
-    margin-bottom: 10px;
-}
-
-.relation-selector label {
-    font-size: 0.95em;
-    cursor: pointer;
-    user-select: none;
-}
-
-.relation-selector input[type='radio'] {
-    margin-right: 6px;
-}
-
-.relation-content p {
-    margin: 5px 0;
-}
-
-.person {
-    font-weight: 500;
-    color: #1a5fb4;
-}
-
-.child {
-    font-weight: 600;
-    color: #2c8d46;
-}
-
-.date {
-    color: #777;
-    font-size: 0.9em;
-    margin-left: 4px;
-}
-
-.relation-message {
-    text-align: center;
-    padding: 10px;
-    font-size: 0.95em;
-    border-radius: 8px;
-}
-
-.relation-message.warning {
-    background: #ffe5e5;
-    color: #b80000;
-    border: 1px solid #f3c2c2;
-}
-
-.relation-message.hint {
-    background: #f2f5f8;
-    color: #555;
-    border: 1px dashed #ccc;
-}
-
-/* --- Кнопки --- */
-.btn-group {
-    display: flex;
-    justify-content: flex-end;
-    gap: 10px;
-    margin-top: 14px;
-}
-
-.btn {
-    padding: 6px 14px;
-    border-radius: 6px;
-    border: none;
-    cursor: pointer;
-    font-size: 0.9em;
-    transition: background 0.2s ease;
-}
-
-.btn.accept {
-    background: #2b8a3e;
-    color: #fff;
-}
-
-.btn.accept:disabled {
-    background: #ccc;
-    cursor: not-allowed;
-}
-
-.btn.accept:hover:not(:disabled) {
-    background: #237734;
-}
-
-.btn.reject {
-    background: #d9534f;
-    color: #fff;
-}
-
-.btn.reject:hover {
-    background: #c9302c;
 }
 </style>

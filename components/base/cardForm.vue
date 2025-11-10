@@ -1,8 +1,6 @@
 <script setup lang="ts">
 import { process } from 'std-env';
 
-const config = useRuntimeConfig();
-
 const props = defineProps({
     modelValue: {
         type: Object,
@@ -13,7 +11,10 @@ const props = defineProps({
     position: { type: Object, required: true, default: () => ({ x: 0, y: 0 }) },
 });
 
-const save = async ()=>{
+const emit = defineEmits(['save']);
+
+const config = useRuntimeConfig();
+const save = async () => {
     const response = await $fetch('api/peoples', {
         baseURL: process.server ? config.public.API_BASE_URL : '',
         method: 'POST',
@@ -22,11 +23,17 @@ const save = async ()=>{
             jsonrpc: '2.0',
             method: 'edit',
             params: {
-                people: props.modelValue
+                people: props.modelValue,
             },
         },
     });
-}
+
+    if (response[0].error) {
+        console.error(response[0].error);
+    } else {
+        emit('save');
+    }
+};
 </script>
 
 <template>
@@ -66,7 +73,7 @@ const save = async ()=>{
                 class="styled-select small-input"
             />
         </small>
-        <button class="btn accept" @click='save'>Зберегти</button>
+        <button class="btn accept" @click="save">Зберегти</button>
     </div>
 </template>
 
@@ -153,7 +160,7 @@ const save = async ()=>{
 }
 
 .btn {
-    margin-top: 8px ;
+    margin-top: 8px;
     padding: 6px 14px;
     border-radius: 6px;
     border: none;
