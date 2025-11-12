@@ -34,7 +34,6 @@ export function useFamilyLines(boxRefs, lineRefs, circleRefs, relations, positio
     function drawMarriageLines() {
         marriageCenters.value = {};
 
-        // очищаем старые круги перед перерисовкой
         document.querySelectorAll('.connector-circle').forEach((el) => el.remove());
 
         relations.value
@@ -64,7 +63,6 @@ export function useFamilyLines(boxRefs, lineRefs, circleRefs, relations, positio
                 const cx = (x1 + x2) / 2;
                 const cy = (y1 + y2) / 2;
 
-                // создаём круг
                 const circle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
                 circle.classList.add('connector-circle');
                 circle.setAttribute('cx', String(cx));
@@ -72,7 +70,6 @@ export function useFamilyLines(boxRefs, lineRefs, circleRefs, relations, positio
                 circle.setAttribute('r', '6');
                 document.querySelector('.line-canvas')?.appendChild(circle);
 
-                // сохраняем координаты центра для потомков
                 const key = makePairKey(rel.from, rel.to);
                 marriageCenters.value[key] = { x: cx, y: cy };
             });

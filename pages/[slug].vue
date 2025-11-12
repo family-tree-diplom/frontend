@@ -369,8 +369,6 @@ useHead({
     position: fixed;
     top: 0;
     left: 0;
-    width: 50000px;
-    height: 50000px;
     transform-origin: 0 0;
     z-index: 0;
     cursor: grab;
@@ -379,8 +377,6 @@ useHead({
     position: absolute;
     top: 0;
     left: 0;
-    width: 100%;
-    height: 100%;
     pointer-events: none;
     z-index: 1;
     overflow: visible;
