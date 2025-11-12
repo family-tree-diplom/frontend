@@ -18,7 +18,9 @@ export function useFamilyLines(boxRefs, lineRefs, circleRefs, relations, positio
     }
 
     function clearDynamicLines() {
-        document.querySelectorAll('.sibling-line, .sibling-child-line, .sibling-connector').forEach((el) => el.remove());
+        document
+            .querySelectorAll('.sibling-line, .sibling-child-line, .sibling-connector')
+            .forEach((el) => el.remove());
     }
 
     function getLineByKey(from: number, to: number): SVGLineElement | undefined {
@@ -32,22 +34,26 @@ export function useFamilyLines(boxRefs, lineRefs, circleRefs, relations, positio
     function drawMarriageLines() {
         marriageCenters.value = {};
 
+        // очищаем старые круги перед перерисовкой
+        document.querySelectorAll('.connector-circle').forEach((el) => el.remove());
+
         relations.value
             .filter((r) => r.type === 'marriage')
             .forEach((rel) => {
                 const el1 = boxRefs.value[rel.from];
                 const el2 = boxRefs.value[rel.to];
-                const line = getLineByKey(rel.from, rel.to);
-                if (!el1 || !el2 || !line) return;
-
                 const pos1 = positions[rel.from];
                 const pos2 = positions[rel.to];
-                if (!pos1 || !pos2) return;
+
+                if (!el1 || !el2 || !pos1 || !pos2) return;
 
                 const x1 = pos1.x + el1.offsetWidth / 2;
                 const y1 = pos1.y + el1.offsetHeight / 2;
                 const x2 = pos2.x + el2.offsetWidth / 2;
                 const y2 = pos2.y + el2.offsetHeight / 2;
+
+                const line = getLineByKey(rel.from, rel.to);
+                if (!line) return;
 
                 line.setAttribute('x1', String(x1));
                 line.setAttribute('y1', String(y1));
@@ -58,12 +64,16 @@ export function useFamilyLines(boxRefs, lineRefs, circleRefs, relations, positio
                 const cx = (x1 + x2) / 2;
                 const cy = (y1 + y2) / 2;
 
+                // создаём круг
+                const circle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+                circle.classList.add('connector-circle');
+                circle.setAttribute('cx', String(cx));
+                circle.setAttribute('cy', String(cy));
+                circle.setAttribute('r', '6');
+                document.querySelector('.line-canvas')?.appendChild(circle);
+
+                // сохраняем координаты центра для потомков
                 const key = makePairKey(rel.from, rel.to);
-                const circle = circleRefs.value[key];
-                if (circle) {
-                    circle.setAttribute('cx', String(cx));
-                    circle.setAttribute('cy', String(cy));
-                }
                 marriageCenters.value[key] = { x: cx, y: cy };
             });
     }

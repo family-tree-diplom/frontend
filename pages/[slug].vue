@@ -234,17 +234,22 @@ const editPerson = () => {
     editor.value = true;
 };
 
-const gridStyle = computed(() => {
-    const size = 20 * camera.scale;
-    return {
-        backgroundImage: `
-      linear-gradient(to right, #e2e8f0 1px, transparent 1px),
-      linear-gradient(to bottom, #e2e8f0 1px, transparent 1px)
-    `,
-        backgroundSize: `${size}px ${size}px`,
-        backgroundColor: '#fff',
-    };
-});
+function shouldDrawLine(relation) {
+    if (!relation || typeof relation !== 'object') return false;
+    const type = relation.type;
+    if (!type) return false;
+    if (type === 'marriage') return true;
+
+    if (type === 'parent') {
+        const list = Array.isArray(relations?.value) ? relations.value : [];
+
+        const parents = list.filter((r) => r && r.type === 'parent' && r.to === relation.to);
+
+        return parents.length < 2;
+    }
+
+    return false;
+}
 
 // --- Виклик при зміні peoples або slug
 watch(
@@ -311,18 +316,19 @@ useHead({
         <div class="canvas-wrapper" :style="[cameraStyle]" @mousedown.self="selectedIds.clear()">
             <svg v-if="peoples?.length > 1" class="line-canvas" :style="{ width: '50000px', height: '50000px' }">
                 <line
-                    v-for="(relation, index) in relations"
+                    v-for="(relation, index) in relations.filter((r) => {
+                        if (!r || !r.type) return false;
+                        if (r.type === 'marriage') return true;
+                        if (r.type === 'parent') {
+                            const parents = relations.filter((rr) => rr && rr.type === 'parent' && rr.to === r.to);
+                            return parents.length < 2;
+                        }
+                        return false;
+                    })"
                     :key="`${relation.from}-${relation.to}`"
                     :ref="(el) => (lineRefs[index] = el)"
                     class="connector-line"
                     :data-relation-key="`${relation.from}-${relation.to}`"
-                />
-                <circle
-                    v-for="(relation, index) in relations.filter((r) => r.type === 'marriage')"
-                    :key="index"
-                    :ref="(el) => (circleRefs[makePairKey(relation.from, relation.to)] = el)"
-                    r="6"
-                    class="connector-circle"
                 />
             </svg>
             <base-card-form
@@ -377,6 +383,7 @@ useHead({
     height: 100%;
     pointer-events: none;
     z-index: 1;
+    overflow: visible;
 }
 .connector-line {
     stroke: #a0aec0;
