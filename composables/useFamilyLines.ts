@@ -127,15 +127,23 @@ export function useFamilyLines(boxRefs, lineRefs, circleRefs, relations, positio
             const els = children.map((id) => boxRefs.value[id]).filter(Boolean);
             if (!els.length) return;
 
-            const first = els[0];
-            const last = els[els.length - 1];
+            const mapped = children
+                .map(id => {
+                    const el = boxRefs.value[id];
+                    return {
+                        id,
+                        el,
+                        x: positions[id].x + el.offsetWidth / 2,
+                        y: positions[id].y
+                    };
+                })
+                .sort((a, b) => a.x - b.x);
 
-            const posFirst = positions[children[0]];
-            const posLast = positions[children[children.length - 1]];
-            if (!posFirst || !posLast) return;
+            const first = mapped[0];
+            const last = mapped[mapped.length - 1];
 
-            const x1 = posFirst.x + first.offsetWidth / 2;
-            const x2 = posLast.x + last.offsetWidth / 2;
+            const x1 = first.x;
+            const x2 = last.x;
             const centerX = (x1 + x2) / 2;
 
             const minY = Math.min(...children.map((id) => positions[id]?.y ?? 0));
