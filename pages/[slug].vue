@@ -236,16 +236,35 @@ const editPerson = () => {
 
 function shouldDrawLine(relation) {
     if (!relation || typeof relation !== 'object') return false;
+
     const type = relation.type;
     if (!type) return false;
+
+    // Брак рисуем всегда – это база для marriageCenters
     if (type === 'marriage') return true;
 
     if (type === 'parent') {
         const list = Array.isArray(relations?.value) ? relations.value : [];
 
-        const parents = list.filter((r) => r && r.type === 'parent' && r.to === relation.to);
+        // Все родительские связи ЭТОГО ребёнка
+        const parentRelations = list.filter((r) => r && r.type === 'parent' && r.to === relation.to);
 
-        return parents.length < 2;
+        // 0–1 родитель – обычная вертикальная линия
+        if (parentRelations.length <= 1) {
+            return true;
+        }
+
+        // 2+ родителя: проверяем, есть ли между ними брак
+        const parentIds = parentRelations.map((p) => p.from);
+
+        const hasMarriage = list.some(
+            (r) => r && r.type === 'marriage' && parentIds.includes(r.from) && parentIds.includes(r.to)
+        );
+
+        // Если родители состоят в браке – прямые parent→child
+        // линии не нужны (дети подвяжутся от marriage/сиблингов).
+        // Если брака нет – рисуем обычные связи.
+        return !hasMarriage;
     }
 
     return false;
@@ -319,10 +338,7 @@ useHead({
                     v-for="(relation, index) in relations.filter((r) => {
                         if (!r || !r.type) return false;
                         if (r.type === 'marriage') return true;
-                        if (r.type === 'parent') {
-                            const parents = relations.filter((rr) => rr && rr.type === 'parent' && rr.to === r.to);
-                            return parents.length < 2;
-                        }
+                        if (r.type === 'parent') return true;
                         return false;
                     })"
                     :key="`${relation.from}-${relation.to}`"
