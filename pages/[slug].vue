@@ -165,7 +165,7 @@ function loadPositions() {
     }
 }
 
-// --- Ініціалізація позицій після повного завантаження дерева
+    // --- Ініціалізація позицій після повного завантаження дерева
 async function initPositions() {
     await nextTick();
     const saved = loadPositions();
