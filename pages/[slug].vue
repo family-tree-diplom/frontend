@@ -33,7 +33,8 @@ const peoplesNew = ref([]);
 
 const siblingGroups = computed(() => {
     const parentsByChild: Record<number, number[]> = {};
-    const groupsByParents: Record<string, { parents: number[], children: number[] }> = {};
+    const groupsByParents: Record<string, { parents: number[]; children: number[] }> = {};
+    const singleParentGroups: Record<number, { parent: number; children: number[] }> = {}; // Нова структура для одиночних батьків
 
     // 1. Для кожної дитини збираємо список її батьків
     relations.value
@@ -47,28 +48,60 @@ const siblingGroups = computed(() => {
             }
         });
 
-    // 2. Групуємо дітей по парі батьків
+    // 2. Групуємо дітей
     Object.entries(parentsByChild).forEach(([childIdStr, parents]) => {
-        if (parents.length < 2) return; // беремо тільки пари батьків
+        const childId = Number(childIdStr);
 
-        const sorted = (parents as number[]).sort((a, b) => a - b);
-        const key = `${sorted[0]}-${sorted[1]}`;
+        // A. Випадок з двома+ батьками:
+        if (parents.length >= 2) {
+            const sorted = (parents as number[]).sort((a, b) => a - b);
+            // Використовуємо тільки перших двох для ключа, як пару (для простоти)
+            const key = `${sorted[0]}-${sorted[1]}`;
 
-        if (!groupsByParents[key]) {
-            groupsByParents[key] = {
-                parents: sorted,
-                children: []
-            };
+            if (!groupsByParents[key]) {
+                groupsByParents[key] = {
+                    parents: sorted,
+                    children: [],
+                };
+            }
+
+            groupsByParents[key].children.push(childId);
         }
 
-        groupsByParents[key].children.push(Number(childIdStr));
+        // B. Випадок з одним батьком:
+        else if (parents.length === 1) {
+            const parentId = parents[0];
+
+            // Групуємо дітей за їхнім єдиним батьком
+            if (!singleParentGroups[parentId]) {
+                singleParentGroups[parentId] = {
+                    parent: parentId,
+                    children: [],
+                };
+            }
+            singleParentGroups[parentId].children.push(childId);
+        }
+
+        // Діти без батьків залишаються поза вирівнюванням
     });
 
-    // 3. Повертаємо масив груп
-    return Object.values(groupsByParents);
+    // 3. Форматуємо масив груп (Об'єднуємо обидва типи)
+    const combinedGroups: Array<{ parents: number[]; children: number[] }> = [];
+
+    // Додаємо групи з двома батьками
+    combinedGroups.push(...Object.values(groupsByParents));
+
+    // Додаємо групи з одним батьком, перетворюючи їх на формат { parents: [id], children: [...] }
+    Object.values(singleParentGroups).forEach((group) => {
+        combinedGroups.push({
+            parents: [group.parent],
+            children: group.children,
+        });
+    });
+
+    // 4. Повертаємо об'єднаний масив груп
+    return combinedGroups;
 });
-
-
 
 const boxRefs = ref([]); // посилання на div-блоки
 const lineRefs = ref([]); // посилання на svg-лінії
@@ -204,62 +237,68 @@ function loadPositions() {
     }
 }
 
-
-
 const alignSiblings = () => {
-    const rowGap = 180;       // вертикальна відстань між поколіннями
-    const siblingGap = 500;   // горизонтальна відстань між дітьми
-    const parentGap = 400;    // відстань між батьками
+    const rowGap = 180; // вертикальна відстань між поколіннями
+    const siblingGap = 500; // горизонтальна відстань між дітьми
+    const parentGap = 400; // відстань між батьками
 
     siblingGroups.value.forEach((group) => {
         if (!group.children.length) return;
 
-        const [p1, p2] = group.parents;
+        const parents = group.parents;
 
-        // Переконуємось що позиції для батьків існують
-        if (!positions[p1]) positions[p1] = { x: 0, y: 0 };
-        if (!positions[p2]) positions[p2] = { x: 0, y: 0 };
+        // --- РОЗРАХУНОК ЦЕНТРУ ВИРІВНЮВАННЯ (centerX) ---
+        let centerX: number;
+        let parentY: number;
 
-        // === 1. ВИРІВНЮВАННЯ БАТЬКІВ ===
-        // Беремо середній Y батьків (щоб вони не "скакали")
-        const parentY = Math.min(
-            positions[p1].y ?? 0,
-            positions[p2].y ?? 0
-        );
+        if (parents.length >= 2) {
+            // **Випадок 1: Два або більше батьків**
+            const [p1, p2] = parents;
 
-        const centerX = (
-            (positions[p1].x ?? 0) +
-            (positions[p2].x ?? 0)
-        ) / 2;
+            if (!positions[p1]) positions[p1] = { x: 0, y: 0 };
+            if (!positions[p2]) positions[p2] = { x: 0, y: 0 };
 
-        // Нові позиції батьків
-        positions[p1] = {
-            x: centerX - parentGap / 2,
-            y: parentY
-        };
+            // Вирівнюємо батьків між собою (залишаємо вашу логіку)
+            parentY = Math.min(positions[p1].y ?? 0, positions[p2].y ?? 0);
+            centerX = ((positions[p1].x ?? 0) + (positions[p2].x ?? 0)) / 2;
 
-        positions[p2] = {
-            x: centerX + parentGap / 2,
-            y: parentY
-        };
+            // Нові позиції батьків
+            positions[p1] = { x: centerX - parentGap / 2, y: parentY };
+            positions[p2] = { x: centerX + parentGap / 2, y: parentY };
+        } else if (parents.length === 1) {
+            // **Випадок 2: Один батько**
+            const p1 = parents[0];
+
+            if (!positions[p1]) positions[p1] = { x: 0, y: 0 };
+
+            // Центр вирівнювання дорівнює X батька
+            centerX = positions[p1].x ?? 0;
+            parentY = positions[p1].y ?? 0;
+
+            // Немає потреби вирівнювати (один батько)
+            // positions[p1] залишається як є
+        } else {
+            // Випадок без батьків (не має відбутися, але на всяк випадок)
+            return;
+        }
 
         // === 2. ВИРІВНЮВАННЯ ДІТЕЙ ===
         const baseY = parentY + rowGap;
 
+        // Якщо дитина одна, totalWidth буде 0, startX = centerX, що і потрібно
         const totalWidth = (group.children.length - 1) * siblingGap;
         const startX = centerX - totalWidth / 2;
 
         group.children.forEach((childId, i) => {
             positions[childId] = {
                 x: startX + i * siblingGap,
-                y: baseY
+                y: baseY,
             };
         });
     });
 
     updateAllLines();
 };
-
 
 // --- Ініціалізація позицій після повного завантаження дерева
 async function initPositions() {
@@ -329,8 +368,6 @@ const editor = ref(false);
 const editPerson = () => {
     editor.value = true;
 };
-
-
 
 function shouldDrawLine(relation) {
     if (!relation || typeof relation !== 'object') return false;
