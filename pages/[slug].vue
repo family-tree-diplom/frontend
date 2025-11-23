@@ -31,6 +31,45 @@ const { data: tree } = await useAsyncData(
 const { peoples, relations, peoplesRefresh } = await useFamilyData(tree.value.id);
 const peoplesNew = ref([]);
 
+const siblingGroups = computed(() => {
+    const parentsByChild: Record<number, number[]> = {};
+    const groupsByParents: Record<string, { parents: number[], children: number[] }> = {};
+
+    // 1. Для кожної дитини збираємо список її батьків
+    relations.value
+        .filter((r) => r.type === 'parent')
+        .forEach((r) => {
+            if (!parentsByChild[r.to]) {
+                parentsByChild[r.to] = [];
+            }
+            if (!parentsByChild[r.to].includes(r.from)) {
+                parentsByChild[r.to].push(r.from);
+            }
+        });
+
+    // 2. Групуємо дітей по парі батьків
+    Object.entries(parentsByChild).forEach(([childIdStr, parents]) => {
+        if (parents.length < 2) return; // беремо тільки пари батьків
+
+        const sorted = (parents as number[]).sort((a, b) => a - b);
+        const key = `${sorted[0]}-${sorted[1]}`;
+
+        if (!groupsByParents[key]) {
+            groupsByParents[key] = {
+                parents: sorted,
+                children: []
+            };
+        }
+
+        groupsByParents[key].children.push(Number(childIdStr));
+    });
+
+    // 3. Повертаємо масив груп
+    return Object.values(groupsByParents);
+});
+
+
+
 const boxRefs = ref([]); // посилання на div-блоки
 const lineRefs = ref([]); // посилання на svg-лінії
 const circleRefs = ref<Record<string, SVGCircleElement>>({});
@@ -165,6 +204,63 @@ function loadPositions() {
     }
 }
 
+
+
+const alignSiblings = () => {
+    const rowGap = 180;       // вертикальна відстань між поколіннями
+    const siblingGap = 500;   // горизонтальна відстань між дітьми
+    const parentGap = 400;    // відстань між батьками
+
+    siblingGroups.value.forEach((group) => {
+        if (!group.children.length) return;
+
+        const [p1, p2] = group.parents;
+
+        // Переконуємось що позиції для батьків існують
+        if (!positions[p1]) positions[p1] = { x: 0, y: 0 };
+        if (!positions[p2]) positions[p2] = { x: 0, y: 0 };
+
+        // === 1. ВИРІВНЮВАННЯ БАТЬКІВ ===
+        // Беремо середній Y батьків (щоб вони не "скакали")
+        const parentY = Math.min(
+            positions[p1].y ?? 0,
+            positions[p2].y ?? 0
+        );
+
+        const centerX = (
+            (positions[p1].x ?? 0) +
+            (positions[p2].x ?? 0)
+        ) / 2;
+
+        // Нові позиції батьків
+        positions[p1] = {
+            x: centerX - parentGap / 2,
+            y: parentY
+        };
+
+        positions[p2] = {
+            x: centerX + parentGap / 2,
+            y: parentY
+        };
+
+        // === 2. ВИРІВНЮВАННЯ ДІТЕЙ ===
+        const baseY = parentY + rowGap;
+
+        const totalWidth = (group.children.length - 1) * siblingGap;
+        const startX = centerX - totalWidth / 2;
+
+        group.children.forEach((childId, i) => {
+            positions[childId] = {
+                x: startX + i * siblingGap,
+                y: baseY
+            };
+        });
+    });
+
+    updateAllLines();
+};
+
+
 // --- Ініціалізація позицій після повного завантаження дерева
 async function initPositions() {
     await nextTick();
@@ -233,6 +329,8 @@ const editor = ref(false);
 const editPerson = () => {
     editor.value = true;
 };
+
+
 
 function shouldDrawLine(relation) {
     if (!relation || typeof relation !== 'object') return false;
@@ -329,6 +427,7 @@ useHead({
         @addRelations="addRelations"
         @removeRelations="removeRelationsPopup = true"
         @editPerson="editPerson"
+        @alignSiblings="alignSiblings"
     ></core-tools>
 
     <div class="main-container viewport">
