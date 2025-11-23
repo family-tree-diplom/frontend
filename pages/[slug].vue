@@ -30,7 +30,44 @@ const { data: tree } = await useAsyncData(
 
 const { peoples, relations, peoplesRefresh } = await useFamilyData(tree.value.id);
 const peoplesNew = ref([]);
-const generations = ref(new Map());
+
+const siblingGroups = computed(() => {
+    const parentsByChild: Record<number, number[]> = {};
+    const groupsByParents: Record<string, { parents: number[], children: number[] }> = {};
+
+    // 1. Для кожної дитини збираємо список її батьків
+    relations.value
+        .filter((r) => r.type === 'parent')
+        .forEach((r) => {
+            if (!parentsByChild[r.to]) {
+                parentsByChild[r.to] = [];
+            }
+            if (!parentsByChild[r.to].includes(r.from)) {
+                parentsByChild[r.to].push(r.from);
+            }
+        });
+
+    // 2. Групуємо дітей по парі батьків
+    Object.entries(parentsByChild).forEach(([childIdStr, parents]) => {
+        if (parents.length < 2) return; // беремо тільки пари батьків
+
+        const sorted = (parents as number[]).sort((a, b) => a - b);
+        const key = `${sorted[0]}-${sorted[1]}`;
+
+        if (!groupsByParents[key]) {
+            groupsByParents[key] = {
+                parents: sorted,
+                children: []
+            };
+        }
+
+        groupsByParents[key].children.push(Number(childIdStr));
+    });
+
+    // 3. Повертаємо масив груп
+    return Object.values(groupsByParents);
+});
+
 
 
 const boxRefs = ref([]); // посилання на div-блоки
@@ -167,222 +204,63 @@ function loadPositions() {
     }
 }
 
-<<<<<<< HEAD
-function computeGenerationsSmart(peoples, relations) {
-    const gen = new Map();
 
-    const rs = relations.map(r => ({
-        from: r.from,
-        to: r.to,
-        type: r.type.trim().toLowerCase()
-    }));
-
-    const parentsByChild = {};
-    const childrenByParent = {};
-    const spouses = {};
-
-    rs.forEach(r => {
-        if (r.type === "parent") {
-            if (!parentsByChild[r.to]) parentsByChild[r.to] = [];
-            parentsByChild[r.to].push(r.from);
-
-            if (!childrenByParent[r.from]) childrenByParent[r.from] = [];
-            childrenByParent[r.from].push(r.to);
-        }
-
-        if (r.type === "marriage") {
-            if (!spouses[r.from]) spouses[r.from] = [];
-            if (!spouses[r.to]) spouses[r.to] = [];
-            spouses[r.from].push(r.to);
-            spouses[r.to].push(r.from);
-        }
-    });
-
-    // 0) Root ancestors = всі, хто НЕ має parent
-    peoples.forEach(p => {
-        const parents = parentsByChild[p.id];
-        if (!parents || parents.length === 0) {
-            gen.set(p.id, 0);
-        }
-    });
-
-    let changed = true;
-    while (changed) {
-        changed = false;
-
-        peoples.forEach(p => {
-            const id = p.id;
-
-            // --- 1) Якщо є батьки → generation = parent + 1
-            const parents = parentsByChild[id] || [];
-            if (parents.length > 0) {
-                const parentGens = parents
-                    .map(pid => gen.get(pid))
-                    .filter(g => g !== undefined);
-
-                if (parentGens.length > 0) {
-                    const g = Math.min(...parentGens) + 1;
-                    if (gen.get(id) !== g) {
-                        gen.set(id, g);
-                        changed = true;
-                    }
-                }
-            }
-
-            // --- 2) Якщо є діти → generation = child - 1
-            const children = childrenByParent[id] || [];
-            if (children.length > 0) {
-                const childGens = children
-                    .map(cid => gen.get(cid))
-                    .filter(g => g !== undefined);
-
-                if (childGens.length > 0) {
-                    const g = Math.min(...childGens) - 1;
-                    if (gen.get(id) !== g) {
-                        gen.set(id, g);
-                        changed = true;
-                    }
-                }
-            }
-
-            // --- 3) Шлюб → однакове покоління
-            const partners = spouses[id] || [];
-            partners.forEach(sp => {
-                if (gen.has(id) && !gen.has(sp)) {
-                    gen.set(sp, gen.get(id));
-                    changed = true;
-                }
-                if (!gen.has(id) && gen.has(sp)) {
-                    gen.set(id, gen.get(sp));
-                    changed = true;
-                }
-            });
-        });
-    }
-
-    return gen;
-}
-
-function normalizeGenerations(gen) {
-    const values = Array.from(gen.values());
-    const minGen = Math.min(...values);
-
-    const newGen = new Map();
-    gen.forEach((g, id) => {
-        newGen.set(id, g - minGen); // зміщуємо базу
-    });
-
-    return newGen;
-}
-
-watch(
-    () => relations.value,
-    () => recomputeGenerations(),
-    { deep: true }
-);
-
-watch(
-    () => peoples.value,
-    () => recomputeGenerations(),
-    { deep: true }
-);
-
-function recomputeGenerations() {
-    const raw = computeGenerationsSmart(peoples.value, relations.value);
-    const normalized = normalizeGenerations(raw);
-    generations.value = normalized;
-}
-
-recomputeGenerations();
 
 const alignSiblings = () => {
-    if (!generations.value || generations.value.size === 0) return;
+    const rowGap = 180;       // вертикальна відстань між поколіннями
+    const siblingGap = 500;   // горизонтальна відстань між дітьми
+    const parentGap = 400;    // відстань між батьками
 
-    const rowGap = 300;   // вертикальний інтервал між поколіннями
-    const colGap = 420;   // горизонтальний інтервал
-
-    // 1. Групуємо людей по поколінням
-    const gens: Record<number, number[]> = {};
-    peoples.value.forEach(p => {
-        const g = generations.value.get(p.id) ?? 0;
-        if (!gens[g]) gens[g] = [];
-        gens[g].push(p.id);
-    });
-
-    // 2. Сортуємо покоління по зростанню
-    const sorted = Object.keys(gens).map(Number).sort((a, b) => a - b);
-
-    let currentY = 100;
-
-    sorted.forEach(g => {
-        const ids = gens[g];
-
-        // ставимо по порядку
-        ids.sort((a, b) => a - b);
-
-        const totalWidth = (ids.length - 1) * colGap;
-        const startX = -totalWidth / 2;
-
-        ids.forEach((id, index) => {
-            positions[id] = {
-                x: startX + index * colGap,
-                y: currentY,
-            };
-        });
-
-        currentY += rowGap;
-    });
-
-    // 3. Вирівнювання sibling-груп
-    siblingGroups.value.forEach(group => {
+    siblingGroups.value.forEach((group) => {
         if (!group.children.length) return;
 
-        const siblingGap = colGap * 1.8; // ← ось тут регулюєш інтервал між братами/сестрами
+        const [p1, p2] = group.parents;
 
-        const gen = generations.value.get(group.children[0]) ?? 0;
+        // Переконуємось що позиції для батьків існують
+        if (!positions[p1]) positions[p1] = { x: 0, y: 0 };
+        if (!positions[p2]) positions[p2] = { x: 0, y: 0 };
 
-        // Y покоління дітей
-        const childY = gens[gen] ? positions[gens[gen][0]].y : 0;
+        // === 1. ВИРІВНЮВАННЯ БАТЬКІВ ===
+        // Беремо середній Y батьків (щоб вони не "скакали")
+        const parentY = Math.min(
+            positions[p1].y ?? 0,
+            positions[p2].y ?? 0
+        );
 
-        // Центр батьків
-        const px = (positions[group.parents[0]].x + positions[group.parents[1]].x) / 2;
+        const centerX = (
+            (positions[p1].x ?? 0) +
+            (positions[p2].x ?? 0)
+        ) / 2;
 
-        // Горизонтальне вирівнювання
+        // Нові позиції батьків
+        positions[p1] = {
+            x: centerX - parentGap / 2,
+            y: parentY
+        };
+
+        positions[p2] = {
+            x: centerX + parentGap / 2,
+            y: parentY
+        };
+
+        // === 2. ВИРІВНЮВАННЯ ДІТЕЙ ===
+        const baseY = parentY + rowGap;
+
         const totalWidth = (group.children.length - 1) * siblingGap;
-        const startX = px - totalWidth / 2;
+        const startX = centerX - totalWidth / 2;
 
-        group.children.forEach((id, i) => {
-            positions[id].x = startX + i * siblingGap;
-            positions[id].y = childY;
+        group.children.forEach((childId, i) => {
+            positions[childId] = {
+                x: startX + i * siblingGap,
+                y: baseY
+            };
         });
     });
 
-    // 4. Вирівнювання батьків (трохи вниз)
-    siblingGroups.value.forEach(group => {
-        const [p1, p2] = group.parents;
-        const childId = group.children[0];
-        const childGen = generations.value.get(childId);
-        const parentGen = childGen - 1;
-
-        const parentY = gens[parentGen] ? positions[gens[parentGen][0]].y : 0;
-
-        const centerX = (positions[p1].x + positions[p2].x) / 2;
-
-        positions[p1].y = parentY;
-        positions[p2].y = parentY;
-        positions[p1].x = centerX - 200;
-        positions[p2].x = centerX + 200;
-    });
-
-    nextTick(() => {
-        updateAllLines();
-        savePositions();
-    });
+    updateAllLines();
 };
 
 
-=======
->>>>>>> parent of 48aec4c (create position tools)
 // --- Ініціалізація позицій після повного завантаження дерева
 async function initPositions() {
     await nextTick();
