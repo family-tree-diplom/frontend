@@ -320,12 +320,50 @@ onMounted(() => {
 
 const alignSiblings = () => {
     // Вхідні параметри
-    const rowGap = 180; // Вертикальна відстань між поколіннями
+    const rowGap = 225; // Вертикальна відстань між поколіннями
     const siblingGap = 500; // Горизонтальна відстань між сім'ями (центр до центру)
-    const parentGap = 400; // Горизонтальна відстань між партнерами у шлюбі
+    const parentGap = 1000; // Горизонтальна відстань між партнерами у шлюбі
+
+    siblingGroups.value.forEach((group, row) => {
+        const parents = group.parents;
+        const childrens = group.children;
+        if (row === 0) {
+            childrens.forEach((children, index) => {
+                if (index === 0) {
+                    positions[children] = { x: 0, y: 0 };
+                    return;
+                }
+                if (!positions[children]) positions[children] = { x: 0, y: 0 };
+                positions[children] = { x: index * siblingGap, y: positions[childrens[0]].y };
+            });
+            parents.forEach((parent, index) => {
+                const x = ((childrens.length - 1) * siblingGap) / 2;
+                if (index === 0) {
+                    positions[parent] = { x: x - parentGap, y: -rowGap };
+                } else {
+                    positions[parent] = { x: x + parentGap, y: -rowGap };
+                }
+            });
+        } else {
+            parents.forEach((parent, index) => {
+                const x = positions[childrens[0]].x;
+                if (index === 0) {
+                    positions[parent] = {
+                        x: x - parentGap / (positions[childrens[0]].y / -rowGap) / 2,
+                        y: -rowGap + positions[childrens[0]].y,
+                    };
+                } else {
+                    positions[parent] = {
+                        x: x + parentGap / (positions[childrens[0]].y / -rowGap) / 2,
+                        y: -rowGap + positions[childrens[0]].y,
+                    };
+                }
+            });
+        }
+    });
 
     // Виправлення: Коректне визначення індексу (index) для логування/дебагу
-    siblingGroups.value.forEach((group, index) => {
+    /*siblingGroups.value.forEach((group, index) => {
         if (!group.children.length) return;
 
         const parents = group.parents;
@@ -405,7 +443,7 @@ const alignSiblings = () => {
                 };
             }
         });
-    });
+    });*/
 
     updateAllLines();
 };
