@@ -48,6 +48,7 @@ defineProps({
     &_align {
         width: 30px;
         height: 30px;
+        fill: #000000;
     }
 }
 </style>
