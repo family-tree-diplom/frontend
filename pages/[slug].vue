@@ -31,6 +31,78 @@ const { data: tree } = await useAsyncData(
 const { peoples, relations, peoplesRefresh } = await useFamilyData(tree.value.id);
 const peoplesNew = ref([]);
 
+const siblingGroups = computed(() => {
+    const parentsByChild: Record<number, number[]> = {};
+    const groupsByParents: Record<string, { parents: number[]; children: number[] }> = {};
+    const singleParentGroups: Record<number, { parent: number; children: number[] }> = {}; // Нова структура для одиночних батьків
+
+    // 1. Для кожної дитини збираємо список її батьків
+    relations.value
+        .filter((r) => r.type === 'parent')
+        .forEach((r) => {
+            if (!parentsByChild[r.to]) {
+                parentsByChild[r.to] = [];
+            }
+            if (!parentsByChild[r.to].includes(r.from)) {
+                parentsByChild[r.to].push(r.from);
+            }
+        });
+
+    // 2. Групуємо дітей
+    Object.entries(parentsByChild).forEach(([childIdStr, parents]) => {
+        const childId = Number(childIdStr);
+
+        // A. Випадок з двома+ батьками:
+        if (parents.length >= 2) {
+            const sorted = (parents as number[]).sort((a, b) => a - b);
+            // Використовуємо тільки перших двох для ключа, як пару (для простоти)
+            const key = `${sorted[0]}-${sorted[1]}`;
+
+            if (!groupsByParents[key]) {
+                groupsByParents[key] = {
+                    parents: sorted,
+                    children: [],
+                };
+            }
+
+            groupsByParents[key].children.push(childId);
+        }
+
+        // B. Випадок з одним батьком:
+        else if (parents.length === 1) {
+            const parentId = parents[0];
+
+            // Групуємо дітей за їхнім єдиним батьком
+            if (!singleParentGroups[parentId]) {
+                singleParentGroups[parentId] = {
+                    parent: parentId,
+                    children: [],
+                };
+            }
+            singleParentGroups[parentId].children.push(childId);
+        }
+
+        // Діти без батьків залишаються поза вирівнюванням
+    });
+
+    // 3. Форматуємо масив груп (Об'єднуємо обидва типи)
+    const combinedGroups: Array<{ parents: number[]; children: number[] }> = [];
+
+    // Додаємо групи з двома батьками
+    combinedGroups.push(...Object.values(groupsByParents));
+
+    // Додаємо групи з одним батьком, перетворюючи їх на формат { parents: [id], children: [...] }
+    Object.values(singleParentGroups).forEach((group) => {
+        combinedGroups.push({
+            parents: [group.parent],
+            children: group.children,
+        });
+    });
+
+    // 4. Повертаємо об'єднаний масив груп
+    return combinedGroups;
+});
+
 const boxRefs = ref([]); // посилання на div-блоки
 const lineRefs = ref([]); // посилання на svg-лінії
 const circleRefs = ref<Record<string, SVGCircleElement>>({});
@@ -165,6 +237,52 @@ function loadPositions() {
     }
 }
 
+const alignSiblings = () => {
+    // Вхідні параметри
+    const rowGap = 225; // Вертикальна відстань між поколіннями
+    const siblingGap = 500; // Горизонтальна відстань між сім'ями (центр до центру)
+    const parentGap = 1000; // Горизонтальна відстань між партнерами у шлюбі
+
+    siblingGroups.value.forEach((group, row) => {
+        const parents = group.parents;
+        const childrens = group.children;
+        if (row === 0) {
+            childrens.forEach((children, index) => {
+                if (index === 0) {
+                    positions[children] = { x: 0, y: 0 };
+                    return;
+                }
+                if (!positions[children]) positions[children] = { x: 0, y: 0 };
+                positions[children] = { x: index * siblingGap, y: positions[childrens[0]].y };
+            });
+            parents.forEach((parent, index) => {
+                const x = ((childrens.length - 1) * siblingGap) / 2;
+                if (index === 0) {
+                    positions[parent] = { x: x - parentGap, y: -rowGap };
+                } else {
+                    positions[parent] = { x: x + parentGap, y: -rowGap };
+                }
+            });
+        } else {
+            parents.forEach((parent, index) => {
+                const x = positions[childrens[0]].x;
+                if (index === 0) {
+                    positions[parent] = {
+                        x: x - parentGap / (positions[childrens[0]].y / -rowGap) / 2,
+                        y: -rowGap + positions[childrens[0]].y,
+                    };
+                } else {
+                    positions[parent] = {
+                        x: x + parentGap / (positions[childrens[0]].y / -rowGap) / 2,
+                        y: -rowGap + positions[childrens[0]].y,
+                    };
+                }
+            });
+        }
+    });
+    updateAllLines();
+};
+
 // --- Ініціалізація позицій після повного завантаження дерева
 async function initPositions() {
     await nextTick();
@@ -234,42 +352,6 @@ const editPerson = () => {
     editor.value = true;
 };
 
-function shouldDrawLine(relation) {
-    if (!relation || typeof relation !== 'object') return false;
-
-    const type = relation.type;
-    if (!type) return false;
-
-    // Брак рисуем всегда – это база для marriageCenters
-    if (type === 'marriage') return true;
-
-    if (type === 'parent') {
-        const list = Array.isArray(relations?.value) ? relations.value : [];
-
-        // Все родительские связи ЭТОГО ребёнка
-        const parentRelations = list.filter((r) => r && r.type === 'parent' && r.to === relation.to);
-
-        // 0–1 родитель – обычная вертикальная линия
-        if (parentRelations.length <= 1) {
-            return true;
-        }
-
-        // 2+ родителя: проверяем, есть ли между ними брак
-        const parentIds = parentRelations.map((p) => p.from);
-
-        const hasMarriage = list.some(
-            (r) => r && r.type === 'marriage' && parentIds.includes(r.from) && parentIds.includes(r.to)
-        );
-
-        // Если родители состоят в браке – прямые parent→child
-        // линии не нужны (дети подвяжутся от marriage/сиблингов).
-        // Если брака нет – рисуем обычные связи.
-        return !hasMarriage;
-    }
-
-    return false;
-}
-
 // --- Виклик при зміні peoples або slug
 watch(
     [peoples, () => route.params.slug],
@@ -303,7 +385,7 @@ if (import.meta.hot) {
 }
 
 useHead({
-    title: tree.value.title,
+    title: 'Дерево ' + tree.value.title,
 });
 </script>
 
@@ -329,10 +411,11 @@ useHead({
         @addRelations="addRelations"
         @removeRelations="removeRelationsPopup = true"
         @editPerson="editPerson"
+        @alignSiblings="alignSiblings"
     ></core-tools>
 
-    <div class="main-container viewport" @mousedown.self="selectedIds.clear()">
-        <div class="canvas-wrapper" :style="[cameraStyle]" >
+    <div class="main-container viewport">
+        <div class="canvas-wrapper" :style="[cameraStyle]" @mousedown.self="selectedIds.clear()">
             <svg v-if="peoples?.length > 1" class="line-canvas" :style="{ width: '50000px', height: '50000px' }">
                 <line
                     v-for="(relation, index) in relations.filter((r) => {
@@ -352,7 +435,6 @@ useHead({
                 v-for="(person, index) in peoplesNew"
                 :key="index"
                 :model-value="person"
-                @save="save"
             ></base-card-form>
             <base-card-form
                 v-if="editor === true && Array.from(selectedIds).length > 0"
