@@ -18,7 +18,7 @@ const props = defineProps({
         required: true,
     },
     makeDraggable: {
-        type: Function as () => ((el: HTMLElement) => void),
+        type: Function as () => (el: HTMLElement) => void,
         required: false,
     },
     boxRefs: {
@@ -49,7 +49,15 @@ onMounted(() => {
     }
 });
 
-const save = async () => {
+const save = () => {
+    if (typeof props.modelValue === 'number') {
+        submit();
+    } else {
+        emit('save');
+    }
+};
+
+const submit = async () => {
     const response = await $fetch('api/peoples', {
         baseURL: process.server ? config.public.API_BASE_URL : '',
         method: 'POST',
@@ -72,12 +80,7 @@ const save = async () => {
 </script>
 
 <template>
-    <div
-        ref="root"
-        class="draggable-box draggable-box_editor"
-        :data-id="personId"
-        :style="style"
-    >
+    <div ref="root" class="draggable-box draggable-box_editor" :data-id="personId" :style="style">
         <div
             class="drag-handle"
             :class="{

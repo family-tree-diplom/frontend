@@ -1,4 +1,3 @@
-// composables/useDraggable.ts
 export type DraggableKey = number | string;
 
 interface Position {
@@ -22,13 +21,26 @@ export function useDraggable(
     const DRAG_THRESHOLD = 3;
 
     function onMouseDown(e: MouseEvent) {
-        const el = (e.target as HTMLElement).closest('.draggable-box') as HTMLElement | null;
+        const target = e.target as HTMLElement;
+
+        const tag = target.tagName;
+        if (
+            tag === 'INPUT' ||
+            tag === 'TEXTAREA' ||
+            tag === 'SELECT' ||
+            tag === 'OPTION' ||
+            target.closest('button') ||
+            target.isContentEditable
+        ) {
+            return;
+        }
+
+        const el = target.closest('.draggable-box') as HTMLElement | null;
         if (!el) return;
 
         const rawId = el.dataset.id;
         if (!rawId) return;
 
-        // Если это число – используем число, если нет – оставляем строку
         const numeric = Number(rawId);
         const id: DraggableKey = Number.isNaN(numeric) ? rawId : numeric;
 

@@ -113,12 +113,13 @@ const add = () => {
     if (!positions[tempId]) {
         positions[tempId] = { x: 200, y: 200 };
     }
-    // Никакого querySelector здесь больше не нужно
 };
 
 const save = async () => {
+    const peoplesForSend = peoplesNew.value.map(({ id, _isNew, ...rest }) => rest);
+
     await submit('save', {
-        peoples: peoplesNew.value,
+        peoples: peoplesForSend,
         treeId: tree.value.id,
     });
 };
@@ -421,8 +422,8 @@ useHead({
         @alignSiblings="alignSiblings"
     ></core-tools>
 
-    <div class="main-container viewport">
-        <div class="canvas-wrapper" :style="[cameraStyle]" @mousedown.self="selectedIds.clear()">
+    <div class="main-container viewport" @mousedown.self="selectedIds.clear()">
+        <div class="canvas-wrapper" :style="[cameraStyle]" >
             <svg v-if="peoples?.length > 1" class="line-canvas" :style="{ width: '50000px', height: '50000px' }">
                 <line
                     v-for="(relation, index) in relations.filter((r) => {
@@ -446,6 +447,7 @@ useHead({
                 :position="positions[person.id]"
                 :make-draggable="makeDraggable"
                 :box-refs="boxRefs"
+                @save="save"
             />
             <base-card-form
                 v-if="editor === true && getNumericSelectedIds().length > 0"
