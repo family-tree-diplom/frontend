@@ -331,8 +331,8 @@ useHead({
         @editPerson="editPerson"
     ></core-tools>
 
-    <div class="main-container viewport">
-        <div class="canvas-wrapper" :style="[cameraStyle]" @mousedown.self="selectedIds.clear()">
+    <div class="main-container viewport" @mousedown.self="selectedIds.clear()">
+        <div class="canvas-wrapper" :style="[cameraStyle]" >
             <svg v-if="peoples?.length > 1" class="line-canvas" :style="{ width: '50000px', height: '50000px' }">
                 <line
                     v-for="(relation, index) in relations.filter((r) => {
@@ -352,6 +352,7 @@ useHead({
                 v-for="(person, index) in peoplesNew"
                 :key="index"
                 :model-value="person"
+                @save="save"
             ></base-card-form>
             <base-card-form
                 v-if="editor === true && Array.from(selectedIds).length > 0"

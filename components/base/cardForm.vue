@@ -39,7 +39,7 @@ const save = async () => {
 <template>
     <div
         v-if="position"
-        class="draggable-box"
+        class="draggable-box draggable-box_editor"
         :style="{ transform: `translate(${position?.x ?? 0}px, ${position?.y ?? 0}px)` }"
     >
         <div
@@ -77,7 +77,7 @@ const save = async () => {
     </div>
 </template>
 
-<style lang="scss" scoped>
+<style lang="scss">
 .draggable-box {
     width: 250px;
     background-color: #fff;
@@ -93,6 +93,9 @@ const save = async () => {
     z-index: 10;
     padding-bottom: 10px;
     box-sizing: border-box;
+    &_editor {
+        z-index: 11 !important;
+    }
 }
 
 .drag-handle {
