@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { useFamilyData } from '~/composables/useFamilyData';
-import { useDraggable } from '~/composables/useDraggable';
+import { useDraggable, type DraggableKey } from '~/composables/useDraggable';
 import { useFamilyLines } from '~/composables/useFamilyLines';
 import { useCamera } from '~/composables/useCamera';
 import { process } from 'std-env';
@@ -29,14 +29,14 @@ const { data: tree } = await useAsyncData(
 );
 
 const { peoples, relations, peoplesRefresh } = await useFamilyData(tree.value.id);
-const peoplesNew = ref([]);
+const peoplesNew = ref<any[]>([]);
+let tempIdCounter = 0;
 
 const siblingGroups = computed(() => {
     const parentsByChild: Record<number, number[]> = {};
     const groupsByParents: Record<string, { parents: number[]; children: number[] }> = {};
-    const singleParentGroups: Record<number, { parent: number; children: number[] }> = {}; // Нова структура для одиночних батьків
+    const singleParentGroups: Record<number, { parent: number; children: number[] }> = {};
 
-    // 1. Для кожної дитини збираємо список її батьків
     relations.value
         .filter((r) => r.type === 'parent')
         .forEach((r) => {
@@ -48,14 +48,11 @@ const siblingGroups = computed(() => {
             }
         });
 
-    // 2. Групуємо дітей
     Object.entries(parentsByChild).forEach(([childIdStr, parents]) => {
         const childId = Number(childIdStr);
 
-        // A. Випадок з двома+ батьками:
         if (parents.length >= 2) {
             const sorted = (parents as number[]).sort((a, b) => a - b);
-            // Використовуємо тільки перших двох для ключа, як пару (для простоти)
             const key = `${sorted[0]}-${sorted[1]}`;
 
             if (!groupsByParents[key]) {
@@ -66,13 +63,9 @@ const siblingGroups = computed(() => {
             }
 
             groupsByParents[key].children.push(childId);
-        }
-
-        // B. Випадок з одним батьком:
-        else if (parents.length === 1) {
+        } else if (parents.length === 1) {
             const parentId = parents[0];
 
-            // Групуємо дітей за їхнім єдиним батьком
             if (!singleParentGroups[parentId]) {
                 singleParentGroups[parentId] = {
                     parent: parentId,
@@ -81,17 +74,11 @@ const siblingGroups = computed(() => {
             }
             singleParentGroups[parentId].children.push(childId);
         }
-
-        // Діти без батьків залишаються поза вирівнюванням
     });
 
-    // 3. Форматуємо масив груп (Об'єднуємо обидва типи)
     const combinedGroups: Array<{ parents: number[]; children: number[] }> = [];
-
-    // Додаємо групи з двома батьками
     combinedGroups.push(...Object.values(groupsByParents));
 
-    // Додаємо групи з одним батьком, перетворюючи їх на формат { parents: [id], children: [...] }
     Object.values(singleParentGroups).forEach((group) => {
         combinedGroups.push({
             parents: [group.parent],
@@ -99,7 +86,6 @@ const siblingGroups = computed(() => {
         });
     });
 
-    // 4. Повертаємо об'єднаний масив груп
     return combinedGroups;
 });
 
@@ -110,13 +96,24 @@ const circleRefs = ref<Record<string, SVGCircleElement>>({});
 const loading = ref(false);
 
 const add = () => {
-    peoplesNew.value.push({
+    const tempId = `temp-${tempIdCounter++}`;
+
+    const person = {
+        id: tempId,
         name: '',
         surname: '',
         birth_day: '',
         death: '',
         gender: 'unknown',
-    });
+        _isNew: true,
+    };
+
+    peoplesNew.value.push(person);
+
+    if (!positions[tempId]) {
+        positions[tempId] = { x: 200, y: 200 };
+    }
+    // Никакого querySelector здесь больше не нужно
 };
 
 const save = async () => {
@@ -126,9 +123,16 @@ const save = async () => {
     });
 };
 
+const selectedIds = reactive(new Set<DraggableKey>());
+
+const getNumericSelectedIds = () => Array.from(selectedIds).filter((id): id is number => typeof id === 'number');
+
 const deletePerson = async () => {
+    const ids = getNumericSelectedIds();
+    if (!ids.length) return;
+
     await submit('deletePerson', {
-        selectedIds: Array.from(selectedIds),
+        selectedIds: ids,
         treeId: tree.value.id,
     });
 };
@@ -140,7 +144,7 @@ const addRelations = () => {
 };
 
 const getPeoples = () => {
-    const ids = Array.from(selectedIds);
+    const ids = getNumericSelectedIds();
     return ids.map((id) => peoples.value.find((item) => item.id === id)).filter(Boolean);
 };
 
@@ -171,12 +175,15 @@ const submit = async (method: String, params: Object, controller = 'peoples') =>
 const relationType = ref(''); // 'marriage' або 'parent'
 
 const addRelation = async () => {
+    const ids = getNumericSelectedIds();
+    if (!ids.length) return;
+
     relationsPopup.value = false;
     await submit(
         'addRelation',
         {
-            type: Array.from(selectedIds).length === 3 ? 'parent' : relationType.value,
-            peoples: Array.from(selectedIds),
+            type: ids.length === 3 ? 'parent' : relationType.value,
+            peoples: ids,
             treeId: tree.value.id,
         },
         'relations'
@@ -185,11 +192,14 @@ const addRelation = async () => {
 
 const removeRelationsPopup = ref(false);
 const removeRelations = async () => {
+    const ids = getNumericSelectedIds();
+    if (!ids.length) return;
+
     removeRelationsPopup.value = false;
     await submit(
         'removeRelations',
         {
-            peoples: Array.from(selectedIds),
+            peoples: ids,
             treeId: tree.value.id,
         },
         'relations'
@@ -200,18 +210,13 @@ interface Position {
     x: number;
     y: number;
 }
-const positions = reactive<Record<number, Position>>({});
+
+const positions = reactive<Record<DraggableKey, Position>>({} as any);
 
 const STORAGE_KEY = computed(() => `family_positions_${route.params.slug}`);
 
 const { camera, cameraStyle } = useCamera();
-const { updateAllLines, marriageCenters, makePairKey } = useFamilyLines(
-    boxRefs,
-    lineRefs,
-    circleRefs,
-    relations,
-    positions
-);
+const { updateAllLines } = useFamilyLines(boxRefs, lineRefs, circleRefs, relations, positions);
 
 function savePositions() {
     if (!process.client || !tree.value?.id) return;
@@ -238,14 +243,14 @@ function loadPositions() {
 }
 
 const alignSiblings = () => {
-    // Вхідні параметри
-    const rowGap = 225; // Вертикальна відстань між поколіннями
-    const siblingGap = 500; // Горизонтальна відстань між сім'ями (центр до центру)
-    const parentGap = 1000; // Горизонтальна відстань між партнерами у шлюбі
+    const rowGap = 225;
+    const siblingGap = 500;
+    const parentGap = 1000;
 
     siblingGroups.value.forEach((group, row) => {
         const parents = group.parents;
         const childrens = group.children;
+
         if (row === 0) {
             childrens.forEach((children, index) => {
                 if (index === 0) {
@@ -289,19 +294,19 @@ async function initPositions() {
     const saved = loadPositions();
 
     peoples.value.forEach((p, index) => {
-        if (saved[p.id]) {
-            positions[p.id] = { x: saved[p.id].x, y: saved[p.id].y };
-        } else if (!positions[p.id]) {
-            positions[p.id] = { x: 150 + index * 100, y: 100 + index * 80 };
+        const key: DraggableKey = p.id;
+
+        if (saved[key]) {
+            positions[key] = { x: saved[key].x, y: saved[key].y };
+        } else if (!positions[key]) {
+            positions[key] = { x: 150 + index * 100, y: 100 + index * 80 };
         }
     });
 
     nextTick(initDragAndLines);
 }
 
-const selectedIds = reactive(new Set<number>());
-
-function toggleSelect(id: number, multi = false) {
+function toggleSelect(id: DraggableKey, multi = false) {
     if (!multi) selectedIds.clear();
     if (selectedIds.has(id)) selectedIds.delete(id);
     else selectedIds.add(id);
@@ -310,7 +315,7 @@ function toggleSelect(id: number, multi = false) {
 const { makeDraggable } = useDraggable(
     () => {
         updateAllLines();
-        savePositions(); // зберігати після кожного руху
+        savePositions();
     },
     camera,
     positions,
@@ -343,7 +348,9 @@ function cleanupDrag() {
 }
 
 const currentPerson = computed(() => {
-    return peoples.value.find((p) => p.id === Array.from(selectedIds)[0]) || null;
+    const firstSelected = getNumericSelectedIds()[0];
+    if (!firstSelected) return null;
+    return peoples.value.find((p) => p.id === firstSelected) || null;
 });
 
 const editor = ref(false);
@@ -399,7 +406,7 @@ useHead({
 
     <core-remove-relations-pupup
         v-model="removeRelationsPopup"
-        :disabled="!Array.from(selectedIds).length"
+        :disabled="!getNumericSelectedIds().length"
         @accept="removeRelations"
     ></core-remove-relations-pupup>
 
@@ -431,17 +438,24 @@ useHead({
                 />
             </svg>
             <base-card-form
-                v-if="peoplesNew.length"
                 v-for="(person, index) in peoplesNew"
-                :key="index"
+                v-if="peoplesNew.length"
+                :key="person.id ?? index"
                 :model-value="person"
-            ></base-card-form>
+                :person-id="person.id"
+                :position="positions[person.id]"
+                :make-draggable="makeDraggable"
+                :box-refs="boxRefs"
+            />
             <base-card-form
-                v-if="editor === true && Array.from(selectedIds).length > 0"
+                v-if="editor === true && getNumericSelectedIds().length > 0"
                 :model-value="currentPerson"
-                :position="positions[Array.from(selectedIds)[0]]"
+                :person-id="currentPerson?.id"
+                :position="positions[getNumericSelectedIds()[0]]"
+                :make-draggable="makeDraggable"
+                :box-refs="boxRefs"
                 @save="editor = false"
-            ></base-card-form>
+            />
             <base-card
                 v-for="person in peoples"
                 :key="person.id"

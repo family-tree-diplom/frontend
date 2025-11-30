@@ -1,18 +1,36 @@
-export function useDraggable(updateAllLines, camera, positions, selectedIds, toggleSelect) {
+// composables/useDraggable.ts
+export type DraggableKey = number | string;
+
+interface Position {
+    x: number;
+    y: number;
+}
+
+export function useDraggable(
+    updateAllLines: () => void,
+    camera: { scale: number },
+    positions: Record<DraggableKey, Position>,
+    selectedIds: Set<DraggableKey>,
+    toggleSelect: (id: DraggableKey, multi?: boolean) => void
+) {
     let isDragging = false;
     let wasSelectedBeforeMouseDown = false;
-    let pressedId: number | null = null;
+    let pressedId: DraggableKey | null = null;
     let startMouseX = 0;
     let startMouseY = 0;
-    let startPositions = {};
+    let startPositions: Record<DraggableKey, Position> = {} as any;
     const DRAG_THRESHOLD = 3;
 
     function onMouseDown(e: MouseEvent) {
-        const el = (e.target as HTMLElement).closest('.draggable-box');
+        const el = (e.target as HTMLElement).closest('.draggable-box') as HTMLElement | null;
         if (!el) return;
 
-        const id = Number(el.dataset.id);
-        if (!id) return;
+        const rawId = el.dataset.id;
+        if (!rawId) return;
+
+        // Если это число – используем число, если нет – оставляем строку
+        const numeric = Number(rawId);
+        const id: DraggableKey = Number.isNaN(numeric) ? rawId : numeric;
 
         e.preventDefault();
 
@@ -31,7 +49,7 @@ export function useDraggable(updateAllLines, camera, positions, selectedIds, tog
             selectedIds.add(id);
         }
 
-        startPositions = {};
+        startPositions = {} as any;
         selectedIds.forEach((sid) => {
             if (!positions[sid]) positions[sid] = { x: 0, y: 0 };
             startPositions[sid] = { ...positions[sid] };
@@ -55,6 +73,7 @@ export function useDraggable(updateAllLines, camera, positions, selectedIds, tog
         const scaledY = dy / camera.scale;
 
         selectedIds.forEach((sid) => {
+            if (!positions[sid]) positions[sid] = { x: 0, y: 0 };
             positions[sid].x = startPositions[sid].x + scaledX;
             positions[sid].y = startPositions[sid].y + scaledY;
         });
@@ -66,10 +85,19 @@ export function useDraggable(updateAllLines, camera, positions, selectedIds, tog
         document.removeEventListener('mousemove', onMouseMove);
         document.removeEventListener('mouseup', onMouseUp);
 
+        if (!pressedId) {
+            isDragging = false;
+            return;
+        }
+
         const multi = e.shiftKey || e.ctrlKey || e.metaKey;
 
         if (!isDragging) {
-            if (wasSelectedBeforeMouseDown) return;
+            if (wasSelectedBeforeMouseDown) {
+                isDragging = false;
+                pressedId = null;
+                return;
+            }
 
             if (!multi) {
                 selectedIds.clear();
@@ -84,7 +112,10 @@ export function useDraggable(updateAllLines, camera, positions, selectedIds, tog
     }
 
     function makeDraggable(el: HTMLElement) {
+        if ((el as any)._draggableBound) return;
+
         el.addEventListener('mousedown', onMouseDown);
+        (el as any)._draggableBound = true;
     }
 
     return { makeDraggable };

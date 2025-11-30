@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { process } from 'std-env';
+import { onMounted, computed, ref } from 'vue';
 
 const props = defineProps({
     modelValue: {
@@ -8,12 +9,46 @@ const props = defineProps({
             return null;
         },
     },
-    position: { type: Object, required: true, default: () => ({ x: 0, y: 0 }) },
+    position: {
+        type: Object as () => { x: number; y: number } | undefined,
+        default: () => ({ x: 0, y: 0 }),
+    },
+    personId: {
+        type: [Number, String],
+        required: true,
+    },
+    makeDraggable: {
+        type: Function as () => ((el: HTMLElement) => void),
+        required: false,
+    },
+    boxRefs: {
+        type: Array as () => HTMLElement[],
+        required: false,
+        default: () => [],
+    },
 });
 
 const emit = defineEmits(['save']);
 
 const config = useRuntimeConfig();
+
+const style = computed(() => {
+    const x = props.position?.x ?? 0;
+    const y = props.position?.y ?? 0;
+    return {
+        transform: `translate(${x}px, ${y}px)`,
+    };
+});
+
+const root = ref<HTMLElement | null>(null);
+
+onMounted(() => {
+    if (root.value && props.makeDraggable) {
+        props.makeDraggable(root.value);
+        props.boxRefs?.push(root.value);
+    }
+});
+
 const save = async () => {
     const response = await $fetch('api/peoples', {
         baseURL: process.server ? config.public.API_BASE_URL : '',
@@ -38,9 +73,10 @@ const save = async () => {
 
 <template>
     <div
-        v-if="position"
+        ref="root"
         class="draggable-box draggable-box_editor"
-        :style="{ transform: `translate(${position?.x ?? 0}px, ${position?.y ?? 0}px)` }"
+        :data-id="personId"
+        :style="style"
     >
         <div
             class="drag-handle"
