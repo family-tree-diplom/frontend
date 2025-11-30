@@ -28,8 +28,101 @@ const { data: tree } = await useAsyncData(
     { default: () => [] }
 );
 
+const { data: test, refresh: testRefresh } = await useAsyncData(
+    'test',
+    async () => {
+        const response = await $fetch('api/peoples', {
+            baseURL: process.server ? config.public.API_BASE_URL : '',
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: {
+                jsonrpc: '2.0',
+                method: 'align',
+                params: {
+                    trees_id: tree.value.id,
+                },
+            },
+        });
+        console.warn(response[0].result[0]);
+        return response[0].result[0];
+    },
+    { default: () => [] }
+);
+
 const { peoples, relations, peoplesRefresh } = await useFamilyData(tree.value.id);
 const peoplesNew = ref([]);
+
+const siblingGroups = computed(() => {
+    const parentsByChild: Record<number, number[]> = {};
+    const groupsByParents: Record<string, { parents: number[]; children: number[] }> = {};
+    const singleParentGroups: Record<number, { parent: number; children: number[] }> = {}; // Нова структура для одиночних батьків
+
+    // 1. Для кожної дитини збираємо список її батьків
+    relations.value
+        .filter((r) => r.type === 'parent')
+        .forEach((r) => {
+            if (!parentsByChild[r.to]) {
+                parentsByChild[r.to] = [];
+            }
+            if (!parentsByChild[r.to].includes(r.from)) {
+                parentsByChild[r.to].push(r.from);
+            }
+        });
+
+    // 2. Групуємо дітей
+    Object.entries(parentsByChild).forEach(([childIdStr, parents]) => {
+        const childId = Number(childIdStr);
+
+        // A. Випадок з двома+ батьками:
+        if (parents.length >= 2) {
+            const sorted = (parents as number[]).sort((a, b) => a - b);
+            // Використовуємо тільки перших двох для ключа, як пару (для простоти)
+            const key = `${sorted[0]}-${sorted[1]}`;
+
+            if (!groupsByParents[key]) {
+                groupsByParents[key] = {
+                    parents: sorted,
+                    children: [],
+                };
+            }
+
+            groupsByParents[key].children.push(childId);
+        }
+
+        // B. Випадок з одним батьком:
+        else if (parents.length === 1) {
+            const parentId = parents[0];
+
+            // Групуємо дітей за їхнім єдиним батьком
+            if (!singleParentGroups[parentId]) {
+                singleParentGroups[parentId] = {
+                    parent: parentId,
+                    children: [],
+                };
+            }
+            singleParentGroups[parentId].children.push(childId);
+        }
+
+        // Діти без батьків залишаються поза вирівнюванням
+    });
+
+    // 3. Форматуємо масив груп (Об'єднуємо обидва типи)
+    const combinedGroups: Array<{ parents: number[]; children: number[] }> = [];
+
+    // Додаємо групи з двома батьками
+    combinedGroups.push(...Object.values(groupsByParents));
+
+    // Додаємо групи з одним батьком, перетворюючи їх на формат { parents: [id], children: [...] }
+    Object.values(singleParentGroups).forEach((group) => {
+        combinedGroups.push({
+            parents: [group.parent],
+            children: group.children,
+        });
+    });
+
+    // 4. Повертаємо об'єднаний масив груп
+    return combinedGroups;
+});
 
 const boxRefs = ref([]); // посилання на div-блоки
 const lineRefs = ref([]); // посилання на svg-лінії
@@ -165,7 +258,53 @@ function loadPositions() {
     }
 }
 
-    // --- Ініціалізація позицій після повного завантаження дерева
+const alignSiblings = () => {
+    // Вхідні параметри
+    const rowGap = 225; // Вертикальна відстань між поколіннями
+    const siblingGap = 500; // Горизонтальна відстань між сім'ями (центр до центру)
+    const parentGap = 1000; // Горизонтальна відстань між партнерами у шлюбі
+
+    siblingGroups.value.forEach((group, row) => {
+        const parents = group.parents;
+        const childrens = group.children;
+        if (row === 0) {
+            childrens.forEach((children, index) => {
+                if (index === 0) {
+                    positions[children] = { x: 0, y: 0 };
+                    return;
+                }
+                if (!positions[children]) positions[children] = { x: 0, y: 0 };
+                positions[children] = { x: index * siblingGap, y: positions[childrens[0]].y };
+            });
+            parents.forEach((parent, index) => {
+                const x = ((childrens.length - 1) * siblingGap) / 2;
+                if (index === 0) {
+                    positions[parent] = { x: x - parentGap, y: -rowGap };
+                } else {
+                    positions[parent] = { x: x + parentGap, y: -rowGap };
+                }
+            });
+        } else {
+            parents.forEach((parent, index) => {
+                const x = positions[childrens[0]].x;
+                if (index === 0) {
+                    positions[parent] = {
+                        x: x - parentGap / (positions[childrens[0]].y / -rowGap) / 2,
+                        y: -rowGap + positions[childrens[0]].y,
+                    };
+                } else {
+                    positions[parent] = {
+                        x: x + parentGap / (positions[childrens[0]].y / -rowGap) / 2,
+                        y: -rowGap + positions[childrens[0]].y,
+                    };
+                }
+            });
+        }
+    });
+    updateAllLines();
+};
+
+// --- Ініціалізація позицій після повного завантаження дерева
 async function initPositions() {
     await nextTick();
     const saved = loadPositions();
@@ -329,6 +468,7 @@ useHead({
         @addRelations="addRelations"
         @removeRelations="removeRelationsPopup = true"
         @editPerson="editPerson"
+        @alignSiblings="alignSiblings"
     ></core-tools>
 
     <div class="main-container viewport">

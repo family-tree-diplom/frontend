@@ -29,21 +29,26 @@ defineProps({
         width: 30px;
         height: 30px;
     }
-    &_personDef{
+    &_personDef {
         width: 30px;
         height: 30px;
     }
-    &_relations{
+    &_relations {
         width: 30px;
         height: 30px;
     }
-    &_removeRelations{
+    &_removeRelations {
         width: 30px;
         height: 30px;
     }
-    &_editPerson{
+    &_editPerson {
         width: 30px;
         height: 30px;
+    }
+    &_align {
+        width: 30px;
+        height: 30px;
+        fill: #000000;
     }
 }
 </style>
