@@ -28,27 +28,6 @@ const { data: tree } = await useAsyncData(
     { default: () => [] }
 );
 
-const { data: test, refresh: testRefresh } = await useAsyncData(
-    'test',
-    async () => {
-        const response = await $fetch('api/peoples', {
-            baseURL: process.server ? config.public.API_BASE_URL : '',
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: {
-                jsonrpc: '2.0',
-                method: 'align',
-                params: {
-                    trees_id: tree.value.id,
-                },
-            },
-        });
-        console.warn(response[0].result[0]);
-        return response[0].result[0];
-    },
-    { default: () => [] }
-);
-
 const { peoples, relations, peoplesRefresh } = await useFamilyData(tree.value.id);
 const peoplesNew = ref([]);
 
@@ -471,8 +450,8 @@ useHead({
         @alignSiblings="alignSiblings"
     ></core-tools>
 
-    <div class="main-container viewport">
-        <div class="canvas-wrapper" :style="[cameraStyle]" @mousedown.self="selectedIds.clear()">
+    <div class="main-container viewport" @mousedown.self="selectedIds.clear()">
+        <div class="canvas-wrapper" :style="[cameraStyle]" >
             <svg v-if="peoples?.length > 1" class="line-canvas" :style="{ width: '50000px', height: '50000px' }">
                 <line
                     v-for="(relation, index) in relations.filter((r) => {
@@ -492,6 +471,7 @@ useHead({
                 v-for="(person, index) in peoplesNew"
                 :key="index"
                 :model-value="person"
+                @save="save"
             ></base-card-form>
             <base-card-form
                 v-if="editor === true && Array.from(selectedIds).length > 0"
