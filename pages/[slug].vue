@@ -28,8 +28,101 @@ const { data: tree } = await useAsyncData(
     { default: () => [] }
 );
 
+const { data: test, refresh: testRefresh } = await useAsyncData(
+    'test',
+    async () => {
+        const response = await $fetch('api/peoples', {
+            baseURL: process.server ? config.public.API_BASE_URL : '',
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: {
+                jsonrpc: '2.0',
+                method: 'align',
+                params: {
+                    trees_id: tree.value.id,
+                },
+            },
+        });
+        console.warn(response[0].result[0]);
+        return response[0].result[0];
+    },
+    { default: () => [] }
+);
+
 const { peoples, relations, peoplesRefresh } = await useFamilyData(tree.value.id);
 const peoplesNew = ref([]);
+
+const siblingGroups = computed(() => {
+    const parentsByChild: Record<number, number[]> = {};
+    const groupsByParents: Record<string, { parents: number[]; children: number[] }> = {};
+    const singleParentGroups: Record<number, { parent: number; children: number[] }> = {}; // Нова структура для одиночних батьків
+
+    // 1. Для кожної дитини збираємо список її батьків
+    relations.value
+        .filter((r) => r.type === 'parent')
+        .forEach((r) => {
+            if (!parentsByChild[r.to]) {
+                parentsByChild[r.to] = [];
+            }
+            if (!parentsByChild[r.to].includes(r.from)) {
+                parentsByChild[r.to].push(r.from);
+            }
+        });
+
+    // 2. Групуємо дітей
+    Object.entries(parentsByChild).forEach(([childIdStr, parents]) => {
+        const childId = Number(childIdStr);
+
+        // A. Випадок з двома+ батьками:
+        if (parents.length >= 2) {
+            const sorted = (parents as number[]).sort((a, b) => a - b);
+            // Використовуємо тільки перших двох для ключа, як пару (для простоти)
+            const key = `${sorted[0]}-${sorted[1]}`;
+
+            if (!groupsByParents[key]) {
+                groupsByParents[key] = {
+                    parents: sorted,
+                    children: [],
+                };
+            }
+
+            groupsByParents[key].children.push(childId);
+        }
+
+        // B. Випадок з одним батьком:
+        else if (parents.length === 1) {
+            const parentId = parents[0];
+
+            // Групуємо дітей за їхнім єдиним батьком
+            if (!singleParentGroups[parentId]) {
+                singleParentGroups[parentId] = {
+                    parent: parentId,
+                    children: [],
+                };
+            }
+            singleParentGroups[parentId].children.push(childId);
+        }
+
+        // Діти без батьків залишаються поза вирівнюванням
+    });
+
+    // 3. Форматуємо масив груп (Об'єднуємо обидва типи)
+    const combinedGroups: Array<{ parents: number[]; children: number[] }> = [];
+
+    // Додаємо групи з двома батьками
+    combinedGroups.push(...Object.values(groupsByParents));
+
+    // Додаємо групи з одним батьком, перетворюючи їх на формат { parents: [id], children: [...] }
+    Object.values(singleParentGroups).forEach((group) => {
+        combinedGroups.push({
+            parents: [group.parent],
+            children: group.children,
+        });
+    });
+
+    // 4. Повертаємо об'єднаний масив груп
+    return combinedGroups;
+});
 
 const boxRefs = ref([]); // посилання на div-блоки
 const lineRefs = ref([]); // посилання на svg-лінії
@@ -164,6 +257,196 @@ function loadPositions() {
         return {};
     }
 }
+
+const findAncestorAndSpouse = () => {
+    // 1. Знаходимо першу особу в масиві
+    const firstPerson = peoples.value[0];
+
+    if (!firstPerson) {
+        console.log('Масив людей порожній.');
+        return;
+    }
+
+    console.log(`--- Дані для: ${firstPerson.name} ${firstPerson.surname} (ID: ${firstPerson.id}) ---`);
+
+    // 2. Знаходимо предка (батька/матір)
+    // Шукаємо зв'язок, де поточна особа є 'to' (дитиною), а інша особа є 'from' (батьком).
+    const parentRelation = relations.value.find((r) => r.to === firstPerson.id && r.type === 'parent');
+
+    let ancestor = null;
+    if (parentRelation) {
+        ancestor = peoples.value.find((p) => p.id === parentRelation.from);
+    }
+
+    // 3. Знаходимо партнера (супруга)
+    // Шукаємо зв'язок, де поточна особа є учасником 'marriage'.
+    const marriageRelation = relations.value.find(
+        (r) => r.type === 'marriage' && (r.from === firstPerson.id || r.to === firstPerson.id)
+    );
+
+    let spouse = null;
+    if (marriageRelation) {
+        // ID партнера — це інше ID у зв'язку 'marriage'
+        const spouseId = marriageRelation.from === firstPerson.id ? marriageRelation.to : marriageRelation.from;
+        spouse = peoples.value.find((p) => p.id === spouseId);
+    }
+
+    // --- Виведення результатів у консоль ---
+
+    // 1. Поточна особа
+    console.log('Поточна особа:', `${firstPerson.name} ${firstPerson.surname} (ID: ${firstPerson.id})`);
+
+    // 2. Предок
+    if (ancestor) {
+        console.log('Головний предок (Батько/Мати):', `${ancestor.name} ${ancestor.surname} (ID: ${ancestor.id})`);
+    } else {
+        console.log('Головний предок:', 'Не знайдено у відносинах "parent".');
+    }
+
+    // 3. Партнер
+    if (spouse) {
+        console.log('Партнер (Супруг/Супруга):', `${spouse.name} ${spouse.surname} (ID: ${spouse.id})`);
+    } else {
+        console.log('Партнер (Супруг/Супруга):', 'Не знайдено у відносинах "marriage".');
+    }
+};
+
+// Виклик функції для перевірки даних. Ви можете викликати її, наприклад, після завантаження даних:
+onMounted(() => {
+    // Переконайтеся, що дані завантажені, перш ніж викликати функцію
+    // У реальному проекті варто додати watcher на peoples.value
+    setTimeout(findAncestorAndSpouse, 1000);
+});
+
+const alignSiblings = () => {
+    // Вхідні параметри
+    const rowGap = 225; // Вертикальна відстань між поколіннями
+    const siblingGap = 500; // Горизонтальна відстань між сім'ями (центр до центру)
+    const parentGap = 1000; // Горизонтальна відстань між партнерами у шлюбі
+
+    siblingGroups.value.forEach((group, row) => {
+        const parents = group.parents;
+        const childrens = group.children;
+        if (row === 0) {
+            childrens.forEach((children, index) => {
+                if (index === 0) {
+                    positions[children] = { x: 0, y: 0 };
+                    return;
+                }
+                if (!positions[children]) positions[children] = { x: 0, y: 0 };
+                positions[children] = { x: index * siblingGap, y: positions[childrens[0]].y };
+            });
+            parents.forEach((parent, index) => {
+                const x = ((childrens.length - 1) * siblingGap) / 2;
+                if (index === 0) {
+                    positions[parent] = { x: x - parentGap, y: -rowGap };
+                } else {
+                    positions[parent] = { x: x + parentGap, y: -rowGap };
+                }
+            });
+        } else {
+            parents.forEach((parent, index) => {
+                const x = positions[childrens[0]].x;
+                if (index === 0) {
+                    positions[parent] = {
+                        x: x - parentGap / (positions[childrens[0]].y / -rowGap) / 2,
+                        y: -rowGap + positions[childrens[0]].y,
+                    };
+                } else {
+                    positions[parent] = {
+                        x: x + parentGap / (positions[childrens[0]].y / -rowGap) / 2,
+                        y: -rowGap + positions[childrens[0]].y,
+                    };
+                }
+            });
+        }
+    });
+
+    // Виправлення: Коректне визначення індексу (index) для логування/дебагу
+    /*siblingGroups.value.forEach((group, index) => {
+        if (!group.children.length) return;
+
+        const parents = group.parents;
+
+        // --- 1. РОЗРАХУНОК ЦЕНТРУ ВИРІВНЮВАННЯ БАТЬКІВ (centerX) ---
+        let centerX: number;
+        let parentY: number;
+
+        if (parents.length >= 2) {
+            // Випадок: Два батька (пара)
+            const [p1, p2] = parents;
+
+            // Забезпечуємо наявність позицій
+            if (!positions[p1]) positions[p1] = { x: 0, y: 0 };
+            if (!positions[p2]) positions[p2] = { x: 0, y: 0 };
+
+            // Розрахунок Y: беремо Y першого батька як базовий
+            const p1_y = positions[p1].y ?? 0;
+            parentY = p1_y;
+
+            // Розрахунок X: Центр браку (використовуючи поточні, можливо, нерівні X)
+            centerX = ((positions[p1].x ?? 0) + (positions[p2].x ?? 0)) / 2;
+
+            // ВСТРОЄНЕ ВИРІВНЮВАННЯ РОДИТЕЛІВ:
+            // Встановлюємо нові позиції для батьків (симетрично навколо centerX та однаковий Y)
+            positions[p1] = { x: centerX - parentGap / 2, y: parentY };
+            positions[p2] = { x: centerX + parentGap / 2, y: parentY };
+        } else if (parents.length === 1) {
+            // Випадок: Один батько
+            const p1 = parents[0];
+
+            if (!positions[p1]) positions[p1] = { x: 0, y: 0 };
+
+            // Центр вирівнювання дорівнює X батька
+            centerX = positions[p1].x ?? 0;
+            parentY = positions[p1].y ?? 0;
+        } else {
+            return;
+        }
+
+        // === 2. ВИРІВНЮВАННЯ ДІТЕЙ/СІМЕЙНИХ ГРУП ===
+        const baseY = parentY + rowGap; // Y-координата для нового ряду
+
+        // Розраховуємо X-координату для центру першої сімейної одиниці в ряду
+        const totalWidth = (group.children.length - 1) * siblingGap;
+        const startX = centerX - totalWidth / 2;
+
+        group.children.forEach((childId, i) => {
+            const familyCenterX = startX + i * siblingGap; // Центр сімейної одиниці
+
+            // Перевіряємо, чи є дитина у шлюбі
+            const marriage = relations.value.find(
+                (r) => r.type === 'marriage' && (r.from === childId || r.to === childId)
+            );
+
+            if (marriage) {
+                // Якщо одружений: позиціонуємо обох симетрично навколо familyCenterX
+                const spouseId = marriage.from === childId ? marriage.to : marriage.from;
+                const halfGap = parentGap / 2;
+
+                // Child position
+                positions[childId] = {
+                    x: familyCenterX - halfGap,
+                    y: baseY,
+                };
+
+                // Spouse position (той самий Y, симетричний X)
+                positions[spouseId] = {
+                    x: familyCenterX + halfGap,
+                    y: baseY,
+                };
+            } else {
+                // Якщо один: позиція дитини дорівнює familyCenterX
+                positions[childId] = {
+                    x: familyCenterX,
+                    y: baseY,
+                };
+            }
+        });
+    });*/
+
+    updateAllLines();
+};
 
 // --- Ініціалізація позицій після повного завантаження дерева
 async function initPositions() {
@@ -329,10 +612,11 @@ useHead({
         @addRelations="addRelations"
         @removeRelations="removeRelationsPopup = true"
         @editPerson="editPerson"
+        @alignSiblings="alignSiblings"
     ></core-tools>
 
-    <div class="main-container viewport" @mousedown.self="selectedIds.clear()">
-        <div class="canvas-wrapper" :style="[cameraStyle]" >
+    <div class="main-container viewport">
+        <div class="canvas-wrapper" :style="[cameraStyle]" @mousedown.self="selectedIds.clear()">
             <svg v-if="peoples?.length > 1" class="line-canvas" :style="{ width: '50000px', height: '50000px' }">
                 <line
                     v-for="(relation, index) in relations.filter((r) => {
@@ -352,7 +636,6 @@ useHead({
                 v-for="(person, index) in peoplesNew"
                 :key="index"
                 :model-value="person"
-                @save="save"
             ></base-card-form>
             <base-card-form
                 v-if="editor === true && Array.from(selectedIds).length > 0"
