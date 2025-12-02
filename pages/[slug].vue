@@ -110,18 +110,48 @@ const add = () => {
 
     peoplesNew.value.push(person);
 
+    const center = cameraCenter.value;
     if (!positions[tempId]) {
-        positions[tempId] = { x: 200, y: 200 };
+        positions[tempId] = { x: center.x, y: center.y };
     }
 };
 
 const save = async () => {
+    if (!peoplesNew.value.length) return;
+
+    const beforeIds = new Set(peoples.value.map((p) => p.id));
+
+    const tempPositions = peoplesNew.value.map((p) => ({
+        tempId: p.id as DraggableKey,
+        position: positions[p.id as DraggableKey] ? { ...positions[p.id as DraggableKey] } : null,
+    }));
+
     const peoplesForSend = peoplesNew.value.map(({ id, _isNew, ...rest }) => rest);
 
     await submit('save', {
         peoples: peoplesForSend,
         treeId: tree.value.id,
     });
+
+    const createdPeoples = peoples.value.filter((p) => !beforeIds.has(p.id));
+
+    createdPeoples.forEach((person, index) => {
+        const mapping = tempPositions[index];
+        if (!mapping) return;
+
+        const { tempId, position } = mapping;
+
+        if (position) {
+            positions[person.id as DraggableKey] = { ...position };
+        }
+
+        if (tempId in positions) {
+            delete positions[tempId];
+        }
+    });
+
+    updateAllLines();
+    savePositions();
 };
 
 const selectedIds = reactive(new Set<DraggableKey>());
@@ -216,7 +246,7 @@ const positions = reactive<Record<DraggableKey, Position>>({} as any);
 
 const STORAGE_KEY = computed(() => `family_positions_${route.params.slug}`);
 
-const { camera, cameraStyle } = useCamera();
+const { camera, cameraStyle, cameraCenter } = useCamera();
 const { updateAllLines } = useFamilyLines(boxRefs, lineRefs, circleRefs, relations, positions);
 
 function savePositions() {
@@ -423,7 +453,7 @@ useHead({
     ></core-tools>
 
     <div class="main-container viewport" @mousedown.self="selectedIds.clear()">
-        <div class="canvas-wrapper" :style="[cameraStyle]" >
+        <div class="canvas-wrapper" :style="[cameraStyle]">
             <svg v-if="peoples?.length > 1" class="line-canvas" :style="{ width: '50000px', height: '50000px' }">
                 <line
                     v-for="(relation, index) in relations.filter((r) => {

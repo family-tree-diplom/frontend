@@ -11,11 +11,28 @@ export function useCamera() {
         startY: 0,
     });
 
+    function screenToWorld(screenX: number, screenY: number) {
+        return {
+            x: (screenX - camera.x) / camera.scale,
+            y: (screenY - camera.y) / camera.scale,
+        };
+    }
+
+    const cameraCenter = computed(() => {
+        if (!process.client) {
+            return { x: 0, y: 0 };
+        }
+
+        const screenX = window.innerWidth / 2;
+        const screenY = window.innerHeight / 2;
+
+        return screenToWorld(screenX, screenY);
+    });
+
     /* =======================================================
        Глобальне масштабування (колесо в будь-якому місці)
        ======================================================= */
     function onWheel(e: WheelEvent) {
-        // Игнорируем зум, если пользователь скроллит внутри input/textarea
         const target = e.target as HTMLElement;
         if (target.closest('input, textarea, select, .draggable-box')) return;
 
@@ -25,11 +42,9 @@ export function useCamera() {
         const delta = e.deltaY < 0 ? 1 + zoomIntensity : 1 - zoomIntensity;
         const newScale = Math.min(Math.max(camera.scale * delta, 0.2), 3);
 
-        // Позиция курсора относительно "мира" (учитывая смещение камеры и масштаб)
         const mouseX = (e.clientX - camera.x) / camera.scale;
         const mouseY = (e.clientY - camera.y) / camera.scale;
 
-        // Двигаем смещение так, чтобы zoom был относительно курсора
         camera.x -= mouseX * (newScale - camera.scale);
         camera.y -= mouseY * (newScale - camera.scale);
         camera.scale = newScale;
@@ -92,5 +107,7 @@ export function useCamera() {
     return {
         camera,
         cameraStyle,
+        cameraCenter,
+        screenToWorld,
     };
 }
