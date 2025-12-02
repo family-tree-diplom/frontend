@@ -42,7 +42,6 @@ onBeforeUnmount(() => {
             {{ person?.birth_day || '' }}{{ person?.death ? ' - ' + person.death : '' }}
         </small>
         <small>{{ person.id }}</small>
-        <small>{{ position.x }}</small>
     </div>
 </template>
 
