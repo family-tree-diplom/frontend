@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { useFamilyData } from '~/composables/useFamilyData';
-import { useDraggable } from '~/composables/useDraggable';
+import { useDraggable, type DraggableKey } from '~/composables/useDraggable';
 import { useFamilyLines } from '~/composables/useFamilyLines';
 import { useCamera } from '~/composables/useCamera';
 import { process } from 'std-env';
@@ -28,36 +28,15 @@ const { data: tree } = await useAsyncData(
     { default: () => [] }
 );
 
-const { data: test, refresh: testRefresh } = await useAsyncData(
-    'test',
-    async () => {
-        const response = await $fetch('api/peoples', {
-            baseURL: process.server ? config.public.API_BASE_URL : '',
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: {
-                jsonrpc: '2.0',
-                method: 'align',
-                params: {
-                    trees_id: tree.value.id,
-                },
-            },
-        });
-        console.warn(response[0].result[0]);
-        return response[0].result[0];
-    },
-    { default: () => [] }
-);
-
 const { peoples, relations, peoplesRefresh } = await useFamilyData(tree.value.id);
-const peoplesNew = ref([]);
+const peoplesNew = ref<any[]>([]);
+let tempIdCounter = 0;
 
 const siblingGroups = computed(() => {
     const parentsByChild: Record<number, number[]> = {};
     const groupsByParents: Record<string, { parents: number[]; children: number[] }> = {};
-    const singleParentGroups: Record<number, { parent: number; children: number[] }> = {}; // Нова структура для одиночних батьків
+    const singleParentGroups: Record<number, { parent: number; children: number[] }> = {};
 
-    // 1. Для кожної дитини збираємо список її батьків
     relations.value
         .filter((r) => r.type === 'parent')
         .forEach((r) => {
@@ -69,14 +48,11 @@ const siblingGroups = computed(() => {
             }
         });
 
-    // 2. Групуємо дітей
     Object.entries(parentsByChild).forEach(([childIdStr, parents]) => {
         const childId = Number(childIdStr);
 
-        // A. Випадок з двома+ батьками:
         if (parents.length >= 2) {
             const sorted = (parents as number[]).sort((a, b) => a - b);
-            // Використовуємо тільки перших двох для ключа, як пару (для простоти)
             const key = `${sorted[0]}-${sorted[1]}`;
 
             if (!groupsByParents[key]) {
@@ -87,13 +63,9 @@ const siblingGroups = computed(() => {
             }
 
             groupsByParents[key].children.push(childId);
-        }
-
-        // B. Випадок з одним батьком:
-        else if (parents.length === 1) {
+        } else if (parents.length === 1) {
             const parentId = parents[0];
 
-            // Групуємо дітей за їхнім єдиним батьком
             if (!singleParentGroups[parentId]) {
                 singleParentGroups[parentId] = {
                     parent: parentId,
@@ -102,17 +74,11 @@ const siblingGroups = computed(() => {
             }
             singleParentGroups[parentId].children.push(childId);
         }
-
-        // Діти без батьків залишаються поза вирівнюванням
     });
 
-    // 3. Форматуємо масив груп (Об'єднуємо обидва типи)
     const combinedGroups: Array<{ parents: number[]; children: number[] }> = [];
-
-    // Додаємо групи з двома батьками
     combinedGroups.push(...Object.values(groupsByParents));
 
-    // Додаємо групи з одним батьком, перетворюючи їх на формат { parents: [id], children: [...] }
     Object.values(singleParentGroups).forEach((group) => {
         combinedGroups.push({
             parents: [group.parent],
@@ -120,7 +86,6 @@ const siblingGroups = computed(() => {
         });
     });
 
-    // 4. Повертаємо об'єднаний масив груп
     return combinedGroups;
 });
 
@@ -131,25 +96,44 @@ const circleRefs = ref<Record<string, SVGCircleElement>>({});
 const loading = ref(false);
 
 const add = () => {
-    peoplesNew.value.push({
+    const tempId = `temp-${tempIdCounter++}`;
+
+    const person = {
+        id: tempId,
         name: '',
         surname: '',
         birth_day: '',
         death: '',
         gender: 'unknown',
-    });
+        _isNew: true,
+    };
+
+    peoplesNew.value.push(person);
+
+    if (!positions[tempId]) {
+        positions[tempId] = { x: 200, y: 200 };
+    }
 };
 
 const save = async () => {
+    const peoplesForSend = peoplesNew.value.map(({ id, _isNew, ...rest }) => rest);
+
     await submit('save', {
-        peoples: peoplesNew.value,
+        peoples: peoplesForSend,
         treeId: tree.value.id,
     });
 };
 
+const selectedIds = reactive(new Set<DraggableKey>());
+
+const getNumericSelectedIds = () => Array.from(selectedIds).filter((id): id is number => typeof id === 'number');
+
 const deletePerson = async () => {
+    const ids = getNumericSelectedIds();
+    if (!ids.length) return;
+
     await submit('deletePerson', {
-        selectedIds: Array.from(selectedIds),
+        selectedIds: ids,
         treeId: tree.value.id,
     });
 };
@@ -161,7 +145,7 @@ const addRelations = () => {
 };
 
 const getPeoples = () => {
-    const ids = Array.from(selectedIds);
+    const ids = getNumericSelectedIds();
     return ids.map((id) => peoples.value.find((item) => item.id === id)).filter(Boolean);
 };
 
@@ -192,12 +176,15 @@ const submit = async (method: String, params: Object, controller = 'peoples') =>
 const relationType = ref(''); // 'marriage' або 'parent'
 
 const addRelation = async () => {
+    const ids = getNumericSelectedIds();
+    if (!ids.length) return;
+
     relationsPopup.value = false;
     await submit(
         'addRelation',
         {
-            type: Array.from(selectedIds).length === 3 ? 'parent' : relationType.value,
-            peoples: Array.from(selectedIds),
+            type: ids.length === 3 ? 'parent' : relationType.value,
+            peoples: ids,
             treeId: tree.value.id,
         },
         'relations'
@@ -206,11 +193,14 @@ const addRelation = async () => {
 
 const removeRelationsPopup = ref(false);
 const removeRelations = async () => {
+    const ids = getNumericSelectedIds();
+    if (!ids.length) return;
+
     removeRelationsPopup.value = false;
     await submit(
         'removeRelations',
         {
-            peoples: Array.from(selectedIds),
+            peoples: ids,
             treeId: tree.value.id,
         },
         'relations'
@@ -221,18 +211,13 @@ interface Position {
     x: number;
     y: number;
 }
-const positions = reactive<Record<number, Position>>({});
+
+const positions = reactive<Record<DraggableKey, Position>>({} as any);
 
 const STORAGE_KEY = computed(() => `family_positions_${route.params.slug}`);
 
 const { camera, cameraStyle } = useCamera();
-const { updateAllLines, marriageCenters, makePairKey } = useFamilyLines(
-    boxRefs,
-    lineRefs,
-    circleRefs,
-    relations,
-    positions
-);
+const { updateAllLines } = useFamilyLines(boxRefs, lineRefs, circleRefs, relations, positions);
 
 function savePositions() {
     if (!process.client || !tree.value?.id) return;
@@ -258,75 +243,15 @@ function loadPositions() {
     }
 }
 
-const findAncestorAndSpouse = () => {
-    // 1. Знаходимо першу особу в масиві
-    const firstPerson = peoples.value[0];
-
-    if (!firstPerson) {
-        console.log('Масив людей порожній.');
-        return;
-    }
-
-    console.log(`--- Дані для: ${firstPerson.name} ${firstPerson.surname} (ID: ${firstPerson.id}) ---`);
-
-    // 2. Знаходимо предка (батька/матір)
-    // Шукаємо зв'язок, де поточна особа є 'to' (дитиною), а інша особа є 'from' (батьком).
-    const parentRelation = relations.value.find((r) => r.to === firstPerson.id && r.type === 'parent');
-
-    let ancestor = null;
-    if (parentRelation) {
-        ancestor = peoples.value.find((p) => p.id === parentRelation.from);
-    }
-
-    // 3. Знаходимо партнера (супруга)
-    // Шукаємо зв'язок, де поточна особа є учасником 'marriage'.
-    const marriageRelation = relations.value.find(
-        (r) => r.type === 'marriage' && (r.from === firstPerson.id || r.to === firstPerson.id)
-    );
-
-    let spouse = null;
-    if (marriageRelation) {
-        // ID партнера — це інше ID у зв'язку 'marriage'
-        const spouseId = marriageRelation.from === firstPerson.id ? marriageRelation.to : marriageRelation.from;
-        spouse = peoples.value.find((p) => p.id === spouseId);
-    }
-
-    // --- Виведення результатів у консоль ---
-
-    // 1. Поточна особа
-    console.log('Поточна особа:', `${firstPerson.name} ${firstPerson.surname} (ID: ${firstPerson.id})`);
-
-    // 2. Предок
-    if (ancestor) {
-        console.log('Головний предок (Батько/Мати):', `${ancestor.name} ${ancestor.surname} (ID: ${ancestor.id})`);
-    } else {
-        console.log('Головний предок:', 'Не знайдено у відносинах "parent".');
-    }
-
-    // 3. Партнер
-    if (spouse) {
-        console.log('Партнер (Супруг/Супруга):', `${spouse.name} ${spouse.surname} (ID: ${spouse.id})`);
-    } else {
-        console.log('Партнер (Супруг/Супруга):', 'Не знайдено у відносинах "marriage".');
-    }
-};
-
-// Виклик функції для перевірки даних. Ви можете викликати її, наприклад, після завантаження даних:
-onMounted(() => {
-    // Переконайтеся, що дані завантажені, перш ніж викликати функцію
-    // У реальному проекті варто додати watcher на peoples.value
-    setTimeout(findAncestorAndSpouse, 1000);
-});
-
 const alignSiblings = () => {
-    // Вхідні параметри
-    const rowGap = 225; // Вертикальна відстань між поколіннями
-    const siblingGap = 500; // Горизонтальна відстань між сім'ями (центр до центру)
-    const parentGap = 1000; // Горизонтальна відстань між партнерами у шлюбі
+    const rowGap = 225;
+    const siblingGap = 500;
+    const parentGap = 1000;
 
     siblingGroups.value.forEach((group, row) => {
         const parents = group.parents;
         const childrens = group.children;
+
         if (row === 0) {
             childrens.forEach((children, index) => {
                 if (index === 0) {
@@ -361,90 +286,6 @@ const alignSiblings = () => {
             });
         }
     });
-
-    // Виправлення: Коректне визначення індексу (index) для логування/дебагу
-    /*siblingGroups.value.forEach((group, index) => {
-        if (!group.children.length) return;
-
-        const parents = group.parents;
-
-        // --- 1. РОЗРАХУНОК ЦЕНТРУ ВИРІВНЮВАННЯ БАТЬКІВ (centerX) ---
-        let centerX: number;
-        let parentY: number;
-
-        if (parents.length >= 2) {
-            // Випадок: Два батька (пара)
-            const [p1, p2] = parents;
-
-            // Забезпечуємо наявність позицій
-            if (!positions[p1]) positions[p1] = { x: 0, y: 0 };
-            if (!positions[p2]) positions[p2] = { x: 0, y: 0 };
-
-            // Розрахунок Y: беремо Y першого батька як базовий
-            const p1_y = positions[p1].y ?? 0;
-            parentY = p1_y;
-
-            // Розрахунок X: Центр браку (використовуючи поточні, можливо, нерівні X)
-            centerX = ((positions[p1].x ?? 0) + (positions[p2].x ?? 0)) / 2;
-
-            // ВСТРОЄНЕ ВИРІВНЮВАННЯ РОДИТЕЛІВ:
-            // Встановлюємо нові позиції для батьків (симетрично навколо centerX та однаковий Y)
-            positions[p1] = { x: centerX - parentGap / 2, y: parentY };
-            positions[p2] = { x: centerX + parentGap / 2, y: parentY };
-        } else if (parents.length === 1) {
-            // Випадок: Один батько
-            const p1 = parents[0];
-
-            if (!positions[p1]) positions[p1] = { x: 0, y: 0 };
-
-            // Центр вирівнювання дорівнює X батька
-            centerX = positions[p1].x ?? 0;
-            parentY = positions[p1].y ?? 0;
-        } else {
-            return;
-        }
-
-        // === 2. ВИРІВНЮВАННЯ ДІТЕЙ/СІМЕЙНИХ ГРУП ===
-        const baseY = parentY + rowGap; // Y-координата для нового ряду
-
-        // Розраховуємо X-координату для центру першої сімейної одиниці в ряду
-        const totalWidth = (group.children.length - 1) * siblingGap;
-        const startX = centerX - totalWidth / 2;
-
-        group.children.forEach((childId, i) => {
-            const familyCenterX = startX + i * siblingGap; // Центр сімейної одиниці
-
-            // Перевіряємо, чи є дитина у шлюбі
-            const marriage = relations.value.find(
-                (r) => r.type === 'marriage' && (r.from === childId || r.to === childId)
-            );
-
-            if (marriage) {
-                // Якщо одружений: позиціонуємо обох симетрично навколо familyCenterX
-                const spouseId = marriage.from === childId ? marriage.to : marriage.from;
-                const halfGap = parentGap / 2;
-
-                // Child position
-                positions[childId] = {
-                    x: familyCenterX - halfGap,
-                    y: baseY,
-                };
-
-                // Spouse position (той самий Y, симетричний X)
-                positions[spouseId] = {
-                    x: familyCenterX + halfGap,
-                    y: baseY,
-                };
-            } else {
-                // Якщо один: позиція дитини дорівнює familyCenterX
-                positions[childId] = {
-                    x: familyCenterX,
-                    y: baseY,
-                };
-            }
-        });
-    });*/
-
     updateAllLines();
 };
 
@@ -454,19 +295,19 @@ async function initPositions() {
     const saved = loadPositions();
 
     peoples.value.forEach((p, index) => {
-        if (saved[p.id]) {
-            positions[p.id] = { x: saved[p.id].x, y: saved[p.id].y };
-        } else if (!positions[p.id]) {
-            positions[p.id] = { x: 150 + index * 100, y: 100 + index * 80 };
+        const key: DraggableKey = p.id;
+
+        if (saved[key]) {
+            positions[key] = { x: saved[key].x, y: saved[key].y };
+        } else if (!positions[key]) {
+            positions[key] = { x: 150 + index * 100, y: 100 + index * 80 };
         }
     });
 
     nextTick(initDragAndLines);
 }
 
-const selectedIds = reactive(new Set<number>());
-
-function toggleSelect(id: number, multi = false) {
+function toggleSelect(id: DraggableKey, multi = false) {
     if (!multi) selectedIds.clear();
     if (selectedIds.has(id)) selectedIds.delete(id);
     else selectedIds.add(id);
@@ -475,7 +316,7 @@ function toggleSelect(id: number, multi = false) {
 const { makeDraggable } = useDraggable(
     () => {
         updateAllLines();
-        savePositions(); // зберігати після кожного руху
+        savePositions();
     },
     camera,
     positions,
@@ -508,7 +349,9 @@ function cleanupDrag() {
 }
 
 const currentPerson = computed(() => {
-    return peoples.value.find((p) => p.id === Array.from(selectedIds)[0]) || null;
+    const firstSelected = getNumericSelectedIds()[0];
+    if (!firstSelected) return null;
+    return peoples.value.find((p) => p.id === firstSelected) || null;
 });
 
 const editor = ref(false);
@@ -516,42 +359,6 @@ const editor = ref(false);
 const editPerson = () => {
     editor.value = true;
 };
-
-function shouldDrawLine(relation) {
-    if (!relation || typeof relation !== 'object') return false;
-
-    const type = relation.type;
-    if (!type) return false;
-
-    // Брак рисуем всегда – это база для marriageCenters
-    if (type === 'marriage') return true;
-
-    if (type === 'parent') {
-        const list = Array.isArray(relations?.value) ? relations.value : [];
-
-        // Все родительские связи ЭТОГО ребёнка
-        const parentRelations = list.filter((r) => r && r.type === 'parent' && r.to === relation.to);
-
-        // 0–1 родитель – обычная вертикальная линия
-        if (parentRelations.length <= 1) {
-            return true;
-        }
-
-        // 2+ родителя: проверяем, есть ли между ними брак
-        const parentIds = parentRelations.map((p) => p.from);
-
-        const hasMarriage = list.some(
-            (r) => r && r.type === 'marriage' && parentIds.includes(r.from) && parentIds.includes(r.to)
-        );
-
-        // Если родители состоят в браке – прямые parent→child
-        // линии не нужны (дети подвяжутся от marriage/сиблингов).
-        // Если брака нет – рисуем обычные связи.
-        return !hasMarriage;
-    }
-
-    return false;
-}
 
 // --- Виклик при зміні peoples або slug
 watch(
@@ -586,7 +393,7 @@ if (import.meta.hot) {
 }
 
 useHead({
-    title: tree.value.title,
+    title: 'Дерево ' + tree.value.title,
 });
 </script>
 
@@ -600,7 +407,7 @@ useHead({
 
     <core-remove-relations-pupup
         v-model="removeRelationsPopup"
-        :disabled="!Array.from(selectedIds).length"
+        :disabled="!getNumericSelectedIds().length"
         @accept="removeRelations"
     ></core-remove-relations-pupup>
 
@@ -615,8 +422,8 @@ useHead({
         @alignSiblings="alignSiblings"
     ></core-tools>
 
-    <div class="main-container viewport">
-        <div class="canvas-wrapper" :style="[cameraStyle]" @mousedown.self="selectedIds.clear()">
+    <div class="main-container viewport" @mousedown.self="selectedIds.clear()">
+        <div class="canvas-wrapper" :style="[cameraStyle]" >
             <svg v-if="peoples?.length > 1" class="line-canvas" :style="{ width: '50000px', height: '50000px' }">
                 <line
                     v-for="(relation, index) in relations.filter((r) => {
@@ -632,17 +439,25 @@ useHead({
                 />
             </svg>
             <base-card-form
-                v-if="peoplesNew.length"
                 v-for="(person, index) in peoplesNew"
-                :key="index"
+                v-if="peoplesNew.length"
+                :key="person.id ?? index"
                 :model-value="person"
-            ></base-card-form>
+                :person-id="person.id"
+                :position="positions[person.id]"
+                :make-draggable="makeDraggable"
+                :box-refs="boxRefs"
+                @save="save"
+            />
             <base-card-form
-                v-if="editor === true && Array.from(selectedIds).length > 0"
+                v-if="editor === true && getNumericSelectedIds().length > 0"
                 :model-value="currentPerson"
-                :position="positions[Array.from(selectedIds)[0]]"
+                :person-id="currentPerson?.id"
+                :position="positions[getNumericSelectedIds()[0]]"
+                :make-draggable="makeDraggable"
+                :box-refs="boxRefs"
                 @save="editor = false"
-            ></base-card-form>
+            />
             <base-card
                 v-for="person in peoples"
                 :key="person.id"
